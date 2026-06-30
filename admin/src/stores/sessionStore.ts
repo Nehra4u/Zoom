@@ -1,0 +1,80 @@
+import { create } from 'zustand'
+import type { ActiveMeeting, SessionParticipant } from '@/types/session'
+
+interface SessionStore {
+  participants: SessionParticipant[]
+  sessionActive: boolean
+  meetingLive: boolean
+  meeting: ActiveMeeting | null
+  socketConnected: boolean
+  setSnapshot: (snapshot: {
+    participants: SessionParticipant[]
+    sessionActive: boolean
+    meetingLive?: boolean
+    meeting?: ActiveMeeting | null
+  }) => void
+  setSocketConnected: (connected: boolean) => void
+  upsertParticipant: (participant: SessionParticipant) => void
+  removeParticipant: (userId: string) => void
+  updateMute: (userId: string, isMuted: boolean) => void
+  clearSession: () => void
+  reset: () => void
+}
+
+export const useSessionStore = create<SessionStore>((set) => ({
+  participants: [],
+  sessionActive: false,
+  meetingLive: false,
+  meeting: null,
+  socketConnected: false,
+
+  setSnapshot: ({ participants, sessionActive, meetingLive, meeting }) =>
+    set({
+      participants,
+      sessionActive,
+      meetingLive: meetingLive ?? false,
+      meeting: meeting ?? null,
+    }),
+
+  setSocketConnected: (socketConnected) => set({ socketConnected }),
+
+  upsertParticipant: (participant) =>
+    set((state) => {
+      const existing = state.participants.find((p) => p.userId === participant.userId)
+      const participants = existing
+        ? state.participants.map((p) => (p.userId === participant.userId ? { ...p, ...participant } : p))
+        : [...state.participants, participant]
+      return { participants, sessionActive: state.meetingLive || participants.length > 0 }
+    }),
+
+  removeParticipant: (userId) =>
+    set((state) => {
+      const participants = state.participants.filter((p) => p.userId !== userId)
+      return {
+        participants,
+        sessionActive: state.meetingLive || participants.length > 0,
+      }
+    }),
+
+  updateMute: (userId, isMuted) =>
+    set((state) => ({
+      participants: state.participants.map((p) => (p.userId === userId ? { ...p, isMuted } : p)),
+    })),
+
+  clearSession: () =>
+    set({
+      participants: [],
+      sessionActive: false,
+      meetingLive: false,
+      meeting: null,
+    }),
+
+  reset: () =>
+    set({
+      participants: [],
+      sessionActive: false,
+      meetingLive: false,
+      meeting: null,
+      socketConnected: false,
+    }),
+}))

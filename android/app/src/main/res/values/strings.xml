@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">ZoomControl</string>
+    <string name="login">Sign in</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="waiting_for_meeting">Waiting for admin to start a meeting…</string>
+    <string name="in_meeting">In meeting</string>
+    <string name="meeting_ended">Meeting ended</string>
+    <string name="removed_from_call">You were removed from the meeting</string>
+    <string name="socket_connected">Connected</string>
+    <string name="socket_disconnected">Disconnected</string>
+</resources>

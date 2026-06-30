@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Environment files — NEVER commit these
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+dist-ssr/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Android build
+*.apk
+*.aab
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+
+# Other projects on Desktop (not part of this repo)
+SPA-POS/
+Sahayaak/
+CarRental/
