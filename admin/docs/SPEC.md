@@ -51,7 +51,7 @@ A controlled video conferencing platform built on top of the **Zoom Meeting SDK*
 - **In scope:** Android APK clients only (no web or iOS SDK client)
 - **In scope:** Single licensed Zoom host account, single private meeting
 - **In scope:** Two portal roles — **super admin** (manages admins) and **admin** (manages APK clients and sessions)
-- **Out of scope:** Admin joining via SDK (the Zoom host is always on the licensed account, not a portal admin)
+- **In scope:** Admin joining meetings via browser or embedded Web SDK (host account)
 - **Out of scope:** Super admin managing APK client accounts directly (delegated to admins)
 - **Out of scope:** Multi-meeting management
 - **Out of scope:** Chat or file-sharing features

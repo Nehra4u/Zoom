@@ -1,6 +1,6 @@
 import { User } from '../models/User.js';
 import { DeviceSession } from '../models/DeviceSession.js';
-import { getLiveMeeting } from './meetingService.js';
+import { getLiveMeetingForAdmin } from './meetingService.js';
 
 export async function getHomeData(userId, deviceId) {
   const user = await User.findById(userId);
@@ -34,16 +34,18 @@ export async function getHomeData(userId, deviceId) {
     await DeviceSession.updateOne({ _id: session._id }, { lastSeenAt: new Date() });
   }
 
-  // Fetch live meeting
-  const liveMeeting = await getLiveMeeting();
-
   const publicUrl = (process.env.PUBLIC_API_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/$/, '');
 
-  if (!liveMeeting) {
+  const liveMeeting = await getLiveMeetingForAdmin(user.createdBy?.toString());
+  const meetingForUser = liveMeeting ?? null;
+
+  if (!meetingForUser) {
     return {
       success: true,
-      status: 'NO_MEETING_ASSIGNED',
-      message: 'No meeting has been assigned yet.',
+      status: liveMeeting ? 'NO_MEETING_ASSIGNED' : 'NO_MEETING_ASSIGNED',
+      message: liveMeeting
+        ? 'No meeting has been assigned to you yet.'
+        : 'No meeting has been assigned yet.',
       user: {
         userId: user._id.toString(),
         name: user.name,
@@ -58,8 +60,6 @@ export async function getHomeData(userId, deviceId) {
     };
   }
 
-  const meetingLink = `https://zoom.us/j/${liveMeeting.meetingNumber}`;
-
   return {
     success: true,
     status: 'SUCCESS',
@@ -71,13 +71,12 @@ export async function getHomeData(userId, deviceId) {
       active: true,
     },
     meeting: {
-      meetingId: liveMeeting.meetingNumber,
-      meetingLink,
-      meetingPassword: liveMeeting.password ?? '',
+      meetingId: meetingForUser.meetingNumber,
+      meetingPassword: meetingForUser.password ?? '',
       sdkKey: process.env.ZOOM_SDK_KEY ?? null,
-      title: liveMeeting.topic ?? 'ZoomControl Session',
-      hostName: 'ZoomMeet Support',
-      startsAt: liveMeeting.startedAt?.toISOString() ?? null,
+      title: meetingForUser.topic ?? 'ZoomControl Session',
+      hostName: meetingForUser.hostDisplayName ?? 'Admin',
+      startsAt: meetingForUser.startedAt?.toISOString() ?? null,
       timezone: 'Asia/Kolkata',
     },
     websocket: {

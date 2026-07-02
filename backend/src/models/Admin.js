@@ -12,6 +12,8 @@ const adminSchema = new mongoose.Schema(
     lockedUntil: { type: Date, default: null },
     lastLoginAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },
+    /** Zoom user ID on your Business account — each admin should have their own for parallel meetings */
+    zoomHostUserId: { type: String, default: null, trim: true },
   },
   { timestamps: true }
 );

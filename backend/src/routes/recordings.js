@@ -6,9 +6,9 @@ const router = Router();
 
 router.use(authenticate, adminOnly);
 
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   try {
-    const recordings = await listRecordings();
+    const recordings = await listRecordings(req.admin);
     res.json({ recordings });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
@@ -26,7 +26,7 @@ router.get('/:id/play-url', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const recording = await getRecordingById(req.params.id);
+    const recording = await getRecordingById(req.params.id, req.admin);
     if (!recording) return res.status(404).json({ error: 'Recording not found' });
     res.json({ recording });
   } catch (err) {

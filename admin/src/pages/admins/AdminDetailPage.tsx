@@ -41,6 +41,7 @@ export function AdminDetailPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<'admin' | 'super_admin'>('admin')
+  const [zoomHostUserId, setZoomHostUserId] = useState('')
 
   const { data: admin, isLoading } = useQuery({
     queryKey: ['admins', id],
@@ -53,14 +54,19 @@ export function AdminDetailPage() {
       setName(admin.name)
       setEmail(admin.email)
       setRole(admin.role)
+      setZoomHostUserId(admin.zoomHostUserId ?? '')
     }
   }, [admin])
 
   const isSelf = currentAdmin?.id === id
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { name: string; email: string; role: 'admin' | 'super_admin' }) =>
-      updateAdmin(id, payload),
+    mutationFn: (payload: {
+      name: string
+      email: string
+      role: 'admin' | 'super_admin'
+      zoomHostUserId: string | null
+    }) => updateAdmin(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admins'] })
       queryClient.invalidateQueries({ queryKey: ['admins', id] })
@@ -105,7 +111,12 @@ export function AdminDetailPage() {
 
   function handleUpdate(e: React.FormEvent) {
     e.preventDefault()
-    updateMutation.mutate({ name, email, role })
+    updateMutation.mutate({
+      name,
+      email,
+      role,
+      zoomHostUserId: zoomHostUserId.trim() || null,
+    })
   }
 
   return (
@@ -149,6 +160,19 @@ export function AdminDetailPage() {
                 <option value="admin">Admin</option>
                 <option value="super_admin">Super admin</option>
               </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-zoom-host">Zoom host user ID</Label>
+              <Input
+                id="edit-zoom-host"
+                value={zoomHostUserId}
+                onChange={(e) => setZoomHostUserId(e.target.value)}
+                placeholder="Leave empty to use default ZOOM_HOST_USER_ID"
+              />
+              <p className="text-xs text-muted-foreground">
+                Assign each admin their own Zoom Business user ID so they can run separate meetings in
+                parallel.
+              </p>
             </div>
             <Button type="submit" disabled={updateMutation.isPending}>
               Save changes

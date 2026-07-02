@@ -11,6 +11,7 @@ export interface Admin {
   createdAt: string
   updatedAt: string
   lastLoginAt: string | null
+  zoomHostUserId: string | null
 }
 
 export interface AuthResponse {

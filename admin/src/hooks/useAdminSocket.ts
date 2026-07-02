@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import { useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { getStoredAccessToken } from '@/api/client'
 import { useSessionStore } from '@/stores/sessionStore'
 import type { SessionParticipant } from '@/types/session'
@@ -54,8 +55,21 @@ export function useAdminSocket(enabled = true) {
       clearSession()
     })
 
-    socket.on('recording:available', () => {
+    socket.on('recording:available', (payload: { topic?: string }) => {
       queryClient.invalidateQueries({ queryKey: ['recordings'] })
+      toast.success(
+        payload.topic
+          ? `Recording ready: ${payload.topic}. Open Recordings to play.`
+          : 'Recording ready — open Recordings to play.',
+        {
+          action: {
+            label: 'Recordings',
+            onClick: () => {
+              window.location.href = '/recordings'
+            },
+          },
+        }
+      )
     })
 
     return () => {

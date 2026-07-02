@@ -30,6 +30,7 @@ export function generateZoomSdkJwt(meetingNumber, role = 0) {
   const jti = crypto.randomUUID();
 
   const payload = {
+    appKey: sdkKey,
     sdkKey,
     mn: meetingNumber,
     role,
@@ -65,20 +66,28 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
     throw err;
   }
 
-  const { meetingNumber, password } = await getMeetingCredentials();
   const useMock =
     process.env.ZOOM_MOCK === 'true' ||
     process.env.NODE_ENV === 'development' ||
     !process.env.ZOOM_SDK_KEY;
 
-  if (!meetingNumber && !useMock) {
-    const err = new Error('No live meeting — wait for admin to start a session');
-    err.status = 503;
-    throw err;
-  }
+  let meetingNumber = '';
+  let password = '';
 
   const userId = user._id ?? user.id;
   const doc = await User.findById(userId);
+
+  if (!useMock) {
+    const { getLiveMeetingForAdmin } = await import('./meetingService.js');
+    const liveMeeting = await getLiveMeetingForAdmin(doc?.createdBy?.toString());
+    if (!liveMeeting) {
+      const err = new Error('No live meeting — wait for admin to start a session');
+      err.status = 503;
+      throw err;
+    }
+    meetingNumber = liveMeeting.meetingNumber;
+    password = liveMeeting.password ?? '';
+  }
 
   if (doc?.lastSdkJti) {
     await revokeUserSdkToken(userId, doc.lastSdkJti, doc.lastSdkJtiExpiresAt);

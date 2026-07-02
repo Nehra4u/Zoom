@@ -14,6 +14,7 @@ function toPublicAdmin(admin) {
     createdAt: admin.createdAt,
     updatedAt: admin.updatedAt,
     lastLoginAt: admin.lastLoginAt,
+    zoomHostUserId: admin.zoomHostUserId ?? null,
   };
 }
 
@@ -91,6 +92,9 @@ export async function updateAdmin(id, updates, actor) {
 
   if (updates.name) admin.name = updates.name;
   if (updates.role) admin.role = updates.role;
+  if (updates.zoomHostUserId !== undefined) {
+    admin.zoomHostUserId = updates.zoomHostUserId || null;
+  }
 
   await admin.save();
 

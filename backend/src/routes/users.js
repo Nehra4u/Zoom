@@ -16,7 +16,7 @@ router.use(authenticate, adminOnly);
 
 router.get('/', async (req, res) => {
   try {
-    const users = await listUsers({ status: req.query.status });
+    const users = await listUsers({ status: req.query.status }, req.admin);
     res.json({ users });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
@@ -49,7 +49,7 @@ router.post('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const user = await getUserById(req.params.id);
+    const user = await getUserById(req.params.id, req.admin);
     if (!user) return res.status(404).json({ error: 'User not found' });
     res.json({ user });
   } catch (err) {

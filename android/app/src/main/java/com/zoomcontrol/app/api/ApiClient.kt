@@ -50,6 +50,7 @@ class ApiClient {
             .url("${Config.API_BASE}/token/zoom")
             .post("".toRequestBody(jsonType))
             .header("Authorization", "Bearer $accessToken")
+            .header("X-Client-Platform", "android")
             .build()
 
         client.newCall(request).execute().use { response ->

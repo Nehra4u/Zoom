@@ -5,6 +5,7 @@ import { writeAuditLog } from './auditService.js';
 import { forceLeaveUser, notifyRejoinAllowed } from './notificationService.js';
 import { handleParticipantLeft } from './sessionService.js';
 import { issueZoomCredentialsForUser, revokeOutstandingUserToken } from './zoomTokenService.js';
+import { getUserForAdmin, userScopeQuery } from './adminScope.js';
 
 function toPublicUser(user) {
   return {
@@ -21,15 +22,20 @@ function toPublicUser(user) {
   };
 }
 
-export async function listUsers(filters = {}) {
-  const query = { status: { $ne: 'deleted' } };
+export async function listUsers(filters = {}, admin = null) {
+  const query = { status: { $ne: 'deleted' }, ...userScopeQuery(admin) };
   if (filters.status) query.status = filters.status;
 
   const users = await User.find(query).sort({ createdAt: -1 });
   return users.map(toPublicUser);
 }
 
-export async function getUserById(id) {
+export async function getUserById(id, admin = null) {
+  if (admin) {
+    const user = await getUserForAdmin(admin, id);
+    return user ? toPublicUser(user) : null;
+  }
+
   const user = await User.findOne({ _id: id, status: { $ne: 'deleted' } });
   if (!user) return null;
   return toPublicUser(user);
@@ -65,10 +71,10 @@ export async function createUser({ name, email, phone, password, zoomDisplayName
 }
 
 export async function updateUser(id, updates, actor) {
-  const user = await User.findOne({ _id: id, status: { $ne: 'deleted' } });
+  const user = await getUserForAdmin(actor, id);
   if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
+    const err = new Error('User not found or access denied');
+    err.status = 403;
     throw err;
   }
 
@@ -100,10 +106,10 @@ export async function updateUser(id, updates, actor) {
 }
 
 export async function activateUser(id, actor) {
-  const user = await User.findOne({ _id: id, status: { $ne: 'deleted' } });
+  const user = await getUserForAdmin(actor, id);
   if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
+    const err = new Error('User not found or access denied');
+    err.status = 403;
     throw err;
   }
 
@@ -127,10 +133,10 @@ export async function activateUser(id, actor) {
 }
 
 export async function deactivateUser(id, actor) {
-  const user = await User.findOne({ _id: id, status: { $ne: 'deleted' } });
+  const user = await getUserForAdmin(actor, id);
   if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
+    const err = new Error('User not found or access denied');
+    err.status = 403;
     throw err;
   }
 
@@ -167,10 +173,10 @@ export async function deactivateUser(id, actor) {
 }
 
 export async function deleteUser(id, actor) {
-  const user = await User.findOne({ _id: id, status: { $ne: 'deleted' } });
+  const user = await getUserForAdmin(actor, id);
   if (!user) {
-    const err = new Error('User not found');
-    err.status = 404;
+    const err = new Error('User not found or access denied');
+    err.status = 403;
     throw err;
   }
 

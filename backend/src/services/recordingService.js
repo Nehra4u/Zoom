@@ -1,6 +1,7 @@
 import { Recording } from '../models/Recording.js';
 import { fetchMeetingRecordings } from './zoomApi.js';
 import { writeAuditLog } from './auditService.js';
+import { recordingScopeQuery } from './adminScope.js';
 
 function toPublicRecording(recording) {
   return {
@@ -13,31 +14,35 @@ function toPublicRecording(recording) {
     duration: recording.duration,
     fileType: recording.fileType,
     fileSize: recording.fileSize,
+    startedBy: recording.startedBy?.toString() ?? null,
     createdAt: recording.createdAt,
   };
 }
 
-export async function listRecordings() {
-  const recordings = await Recording.find().sort({ startTime: -1 });
+export async function listRecordings(admin = null) {
+  const query = recordingScopeQuery(admin);
+  const recordings = await Recording.find(query).sort({ startTime: -1 });
   return recordings.map(toPublicRecording);
 }
 
-export async function getRecordingById(id) {
-  const recording = await Recording.findById(id);
+export async function getRecordingById(id, admin = null) {
+  const query = { _id: id, ...recordingScopeQuery(admin) };
+  const recording = await Recording.findOne(query);
   if (!recording) return null;
   return toPublicRecording(recording);
 }
 
 export async function getFreshPlayUrl(id, actor) {
-  const recording = await Recording.findById(id);
+  const recording = await getRecordingById(id, actor);
   if (!recording) {
-    const err = new Error('Recording not found');
+    const err = new Error('Recording not found or access denied');
     err.status = 404;
     throw err;
   }
 
-  const zoomData = await fetchMeetingRecordings(recording.zoomMeetingId);
-  const file = zoomData.recording_files?.find((f) => f.id === recording.zoomRecordingId)
+  const doc = await Recording.findById(id);
+  const zoomData = await fetchMeetingRecordings(doc.zoomMeetingId);
+  const file = zoomData.recording_files?.find((f) => f.id === doc.zoomRecordingId)
     ?? zoomData.recording_files?.[0];
 
   if (!file?.play_url) {
@@ -46,14 +51,14 @@ export async function getFreshPlayUrl(id, actor) {
     throw err;
   }
 
-  recording.playUrlFetchedAt = new Date();
-  await recording.save();
+  doc.playUrlFetchedAt = new Date();
+  await doc.save();
 
   if (actor) {
     await writeAuditLog({
       actor,
       action: 'recording_accessed',
-      meta: { recordingId: id, zoomRecordingId: recording.zoomRecordingId },
+      meta: { recordingId: id, zoomRecordingId: doc.zoomRecordingId },
     });
   }
 

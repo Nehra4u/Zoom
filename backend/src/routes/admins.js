@@ -60,8 +60,8 @@ router.get('/:id', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, email, role } = req.body;
-    const admin = await updateAdmin(req.params.id, { name, email, role }, req.admin);
+    const { name, email, role, zoomHostUserId } = req.body;
+    const admin = await updateAdmin(req.params.id, { name, email, role, zoomHostUserId }, req.admin);
     res.json({ admin });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

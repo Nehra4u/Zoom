@@ -8,6 +8,7 @@ export interface Recording {
   duration: number
   fileType: string
   fileSize: number
+  startedBy: string | null
   createdAt: string
 }
 

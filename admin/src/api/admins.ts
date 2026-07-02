@@ -32,7 +32,10 @@ export async function createAdmin(payload: {
   return data.admin
 }
 
-export async function updateAdmin(id: string, payload: { name?: string; email?: string; role?: string }) {
+export async function updateAdmin(
+  id: string,
+  payload: { name?: string; email?: string; role?: string; zoomHostUserId?: string | null }
+) {
   const { data } = await api.patch<{ admin: Admin }>(`/admins/${id}`, payload)
   return data.admin
 }

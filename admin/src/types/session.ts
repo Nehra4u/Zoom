@@ -7,6 +7,10 @@ export interface ActiveMeeting {
   status: 'live' | 'ended'
   startedAt: string | null
   endedAt: string | null
+  startUrl?: string | null
+  joinUrl?: string | null
+  hostDisplayName?: string | null
+  startedBy?: string | null
 }
 
 export interface SessionParticipant {

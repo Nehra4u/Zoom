@@ -44,8 +44,8 @@ export async function getZoomAccessToken() {
   return cachedToken;
 }
 
-function getHostUserId() {
-  const hostId = process.env.ZOOM_HOST_USER_ID;
+function getHostUserId(overrideHostUserId) {
+  const hostId = overrideHostUserId || process.env.ZOOM_HOST_USER_ID;
   if (!hostId) {
     throw new Error('ZOOM_HOST_USER_ID is not configured');
   }
@@ -59,22 +59,22 @@ function encodeMeetingUuid(uuid) {
   return encodeURIComponent(uuid);
 }
 
-export async function createInstantMeeting() {
+export async function createInstantMeeting({ topic = 'ZoomControl Session', hostUserId = null } = {}) {
   if (isMockMode()) {
     throw new Error('createInstantMeeting called in mock mode');
   }
 
   const token = await getZoomAccessToken();
-  const hostUserId = getHostUserId();
+  const zoomHostId = getHostUserId(hostUserId);
 
-  const response = await fetch(`https://api.zoom.us/v2/users/${hostUserId}/meetings`, {
+  const response = await fetch(`https://api.zoom.us/v2/users/${zoomHostId}/meetings`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      topic: 'ZoomControl Session',
+      topic,
       type: 1,
       settings: {
         join_before_host: true,
@@ -96,6 +96,8 @@ export async function createInstantMeeting() {
     zoomMeetingUuid: data.uuid,
     zoomMeetingId: String(data.id),
     topic: data.topic,
+    startUrl: data.start_url ?? null,
+    joinUrl: data.join_url ?? null,
   };
 }
 
@@ -137,6 +139,30 @@ export async function removeLiveParticipant(meetingId, participantId) {
   if (!response.ok && response.status !== 404) {
     const text = await response.text();
     throw new Error(`Zoom remove participant failed: ${response.status} ${text}`);
+  }
+}
+
+export async function muteLiveParticipant(meetingId, participantId, mute) {
+  if (isMockMode()) return;
+
+  const token = await getZoomAccessToken();
+  const encodedMeeting = encodeMeetingUuid(String(meetingId));
+
+  const response = await fetch(
+    `https://api.zoom.us/v2/live_meetings/${encodedMeeting}/participants/${participantId}/status`,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action: mute ? 'mute' : 'unmute' }),
+    }
+  );
+
+  if (!response.ok && response.status !== 404) {
+    const text = await response.text();
+    throw new Error(`Zoom mute participant failed: ${response.status} ${text}`);
   }
 }
 
@@ -234,4 +260,25 @@ export async function fetchZoomHostUserId() {
 
   const data = await response.json();
   return data.id;
+}
+
+export async function fetchHostZakToken(hostUserId = null) {
+  if (isMockMode()) {
+    return 'mock-zak-token';
+  }
+
+  const token = await getZoomAccessToken();
+  const zoomHostId = getHostUserId(hostUserId);
+  const response = await fetch(
+    `https://api.zoom.us/v2/users/${zoomHostId}/token?type=zak`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Zoom ZAK fetch failed: ${response.status} ${text}`);
+  }
+
+  const data = await response.json();
+  return data.token;
 }

@@ -1,7 +1,8 @@
 import { SessionState } from '../models/SessionState.js';
 import { User } from '../models/User.js';
 import { getIo } from './io.js';
-import { getLiveMeeting, toPublicMeeting } from './meetingService.js';
+import { getLiveMeetingForAdmin, toPublicMeeting } from './meetingService.js';
+import { userScopeQuery } from './adminScope.js';
 
 function emitAdmin(event, payload) {
   const io = getIo();
@@ -24,18 +25,29 @@ function toParticipant(session, user) {
   };
 }
 
-export async function getCurrentSession() {
-  const liveMeeting = await getLiveMeeting();
-  const sessions = await SessionState.find({ inCall: true }).sort({ joinedAt: -1 });
+export async function getCurrentSession(admin = null) {
+  const liveMeeting = admin ? await getLiveMeetingForAdmin(admin.sub) : null;
+  const sessionQuery = { inCall: true };
+  if (liveMeeting?.meetingNumber) {
+    sessionQuery.meetingId = liveMeeting.meetingNumber;
+  }
+
+  const sessions = await SessionState.find(sessionQuery).sort({ joinedAt: -1 });
   const userIds = sessions.map((s) => s.userId);
-  const users = await User.find({ _id: { $in: userIds } });
+  const userQuery = { _id: { $in: userIds }, ...userScopeQuery(admin) };
+  const users = await User.find(userQuery);
   const userMap = new Map(users.map((u) => [u._id.toString(), u]));
+  const scopedUserIds = new Set(users.map((u) => u._id.toString()));
+
+  const participants = sessions
+    .filter((s) => scopedUserIds.has(s.userId.toString()))
+    .map((s) => toParticipant(s, userMap.get(s.userId.toString())));
 
   return {
-    sessionActive: Boolean(liveMeeting) || sessions.length > 0,
+    sessionActive: Boolean(liveMeeting) || participants.length > 0,
     meetingLive: Boolean(liveMeeting),
-    meeting: toPublicMeeting(liveMeeting),
-    participants: sessions.map((s) => toParticipant(s, userMap.get(s.userId.toString()))),
+    meeting: liveMeeting ? toPublicMeeting(liveMeeting) : null,
+    participants,
   };
 }
 
@@ -140,5 +152,19 @@ export async function handleSessionEnded(meetingId) {
   }
 
   const { ActiveMeeting } = await import('../models/ActiveMeeting.js');
-  await ActiveMeeting.updateMany({ status: 'live' }, { status: 'ended', endedAt: new Date() });
+  if (meetingId) {
+    await ActiveMeeting.updateMany(
+      {
+        status: 'live',
+        $or: [
+          { meetingNumber: String(meetingId) },
+          { zoomMeetingUuid: String(meetingId) },
+          { zoomMeetingId: String(meetingId) },
+        ],
+      },
+      { status: 'ended', endedAt: new Date() }
+    );
+  } else {
+    await ActiveMeeting.updateMany({ status: 'live' }, { status: 'ended', endedAt: new Date() });
+  }
 }

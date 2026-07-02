@@ -7,16 +7,41 @@ import {
   handleParticipantMuted,
   handleSessionEnded,
 } from '../services/sessionService.js';
-import { startMeeting, endMeeting, removeParticipantFromCall } from '../services/meetingService.js';
+import {
+  startMeeting,
+  endMeeting,
+  removeParticipantFromCall,
+  getMeetingJoinInfo,
+  issueAdminJoinToken,
+  setParticipantMuted,
+} from '../services/meetingService.js';
 
 const router = Router();
 
 router.use(authenticate, adminOnly);
 
-router.get('/current', async (_req, res) => {
+router.get('/current', async (req, res) => {
   try {
-    const session = await getCurrentSession();
+    const session = await getCurrentSession(req.admin);
     res.json(session);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get('/join-url', async (req, res) => {
+  try {
+    const joinInfo = await getMeetingJoinInfo(req.admin);
+    res.json(joinInfo);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post('/join-token', async (req, res) => {
+  try {
+    const credentials = await issueAdminJoinToken(req.admin);
+    res.json(credentials);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
@@ -49,7 +74,50 @@ router.post('/participants/:userId/remove', async (req, res) => {
   }
 });
 
+router.post('/participants/:userId/mute', async (req, res) => {
+  try {
+    const result = await setParticipantMuted(req.params.userId, true, req.admin);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post('/participants/:userId/unmute', async (req, res) => {
+  try {
+    const result = await setParticipantMuted(req.params.userId, false, req.admin);
+    res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 if (process.env.NODE_ENV !== 'production') {
+  router.post('/dev/end-all-live', async (_req, res) => {
+    try {
+      const { ActiveMeeting } = await import('../models/ActiveMeeting.js');
+      const { endMeeting: endZoomMeeting, isMockMode } = await import('../services/zoomApi.js');
+      const { handleSessionEnded } = await import('../services/sessionService.js');
+      const liveMeetings = await ActiveMeeting.find({ status: 'live' });
+      for (const meeting of liveMeetings) {
+        if (!isMockMode()) {
+          try {
+            await endZoomMeeting(meeting.zoomMeetingUuid || meeting.meetingNumber);
+          } catch {
+            // ignore stale Zoom meetings during test cleanup
+          }
+        }
+        meeting.status = 'ended';
+        meeting.endedAt = new Date();
+        await meeting.save();
+        await handleSessionEnded(meeting.meetingNumber);
+      }
+      res.json({ ok: true, ended: liveMeetings.length });
+    } catch (err) {
+      res.status(err.status || 500).json({ error: err.message });
+    }
+  });
+
   router.post('/dev/simulate', async (req, res) => {
     try {
       const { event, userId, zoomParticipantId, displayName, meetingId, muted } = req.body;

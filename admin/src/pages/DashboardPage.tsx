@@ -1,17 +1,32 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
-import { Mic, MicOff, PhoneOff, Play, Radio, UserMinus, UserX, Wifi, WifiOff } from 'lucide-react'
+import {
+  ExternalLink,
+  Mic,
+  MicOff,
+  PhoneOff,
+  Play,
+  Radio,
+  UserMinus,
+  UserX,
+  Wifi,
+  WifiOff,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import {
   endMeeting,
   fetchCurrentSession,
+  fetchMeetingJoinUrl,
+  muteParticipant,
   removeParticipantFromCall,
   simulateSessionEvent,
   startMeeting,
+  unmuteParticipant,
 } from '@/api/session'
 import { fetchUsers, deactivateUser } from '@/api/users'
 import { getErrorMessage } from '@/api/client'
+import { MeetingJoinPanel } from '@/components/MeetingJoinPanel'
 import { useSessionStore } from '@/stores/sessionStore'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -31,14 +46,20 @@ function ParticipantCard({
   participant,
   onRemove,
   onBlock,
+  onMute,
+  onUnmute,
   removing,
   blocking,
+  muting,
 }: {
   participant: SessionParticipant
   onRemove: (userId: string) => void
   onBlock: (userId: string) => void
+  onMute: (userId: string) => void
+  onUnmute: (userId: string) => void
   removing: boolean
   blocking: boolean
+  muting: boolean
 }) {
   return (
     <Card>
@@ -63,13 +84,34 @@ function ParticipantCard({
             )}
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Badge variant={participant.isMuted ? 'secondary' : 'success'}>
             {participant.isMuted ? 'Muted' : 'Live'}
           </Badge>
           <Button variant="outline" size="sm" asChild>
             <Link to={`/users/${participant.userId}`}>View</Link>
           </Button>
+          {participant.isMuted ? (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={muting}
+              onClick={() => onUnmute(participant.userId)}
+            >
+              <Mic className="h-4 w-4" />
+              Unmute
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={muting}
+              onClick={() => onMute(participant.userId)}
+            >
+              <MicOff className="h-4 w-4" />
+              Mute
+            </Button>
+          )}
           <Button
             variant="outline"
             size="sm"
@@ -136,7 +178,21 @@ export function DashboardPage() {
     onSuccess: () => {
       setEndDialogOpen(false)
       invalidateSession()
-      toast.success('Meeting ended')
+      toast.success('Meeting ended — recording will appear in Recordings when ready')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const joinBrowserMutation = useMutation({
+    mutationFn: fetchMeetingJoinUrl,
+    onSuccess: (joinInfo) => {
+      const url = joinInfo.startUrl ?? joinInfo.joinUrl
+      if (!url) {
+        toast.error('No join URL available for this meeting')
+        return
+      }
+      window.open(url, '_blank', 'noopener,noreferrer')
+      toast.success('Opening meeting in browser')
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -146,6 +202,24 @@ export function DashboardPage() {
     onSuccess: () => {
       invalidateSession()
       toast.success('Participant removed from call')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const muteMutation = useMutation({
+    mutationFn: muteParticipant,
+    onSuccess: () => {
+      invalidateSession()
+      toast.success('Participant muted')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const unmuteMutation = useMutation({
+    mutationFn: unmuteParticipant,
+    onSuccess: () => {
+      invalidateSession()
+      toast.success('Participant unmuted')
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -194,15 +268,26 @@ export function DashboardPage() {
               Start Meeting
             </Button>
           ) : (
-            <Button
-              size="sm"
-              variant="destructive"
-              disabled={endMutation.isPending}
-              onClick={() => setEndDialogOpen(true)}
-            >
-              <PhoneOff className="h-4 w-4" />
-              End Meeting
-            </Button>
+            <>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={joinBrowserMutation.isPending}
+                onClick={() => joinBrowserMutation.mutate()}
+              >
+                <ExternalLink className="h-4 w-4" />
+                Join in Browser
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                disabled={endMutation.isPending}
+                onClick={() => setEndDialogOpen(true)}
+              >
+                <PhoneOff className="h-4 w-4" />
+                End Meeting
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -223,9 +308,16 @@ export function DashboardPage() {
             <p>
               <span className="text-muted-foreground">Participants:</span> {participants.length}
             </p>
+            <p>
+              <Link to="/recordings" className="text-primary underline-offset-4 hover:underline">
+                View recordings
+              </Link>
+            </p>
           </CardContent>
         </Card>
       )}
+
+      <MeetingJoinPanel meetingLive={meetingLive} />
 
       {sessionQuery.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading session…</p>
@@ -234,7 +326,7 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle>No active meeting</CardTitle>
             <CardDescription>
-              Click Start Meeting to create an instant Zoom session. Active APK users will be notified to join.
+              Click Start Meeting to create an instant Zoom session. Your active APK users will be notified to join.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -243,7 +335,7 @@ export function DashboardPage() {
           <CardHeader>
             <CardTitle>Waiting for participants</CardTitle>
             <CardDescription>
-              Meeting is live. When APK clients join, they will appear here in real time.
+              Meeting is live. When your APK clients join, they will appear here in real time.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -255,8 +347,11 @@ export function DashboardPage() {
               participant={p}
               onRemove={(id) => removeMutation.mutate(id)}
               onBlock={(id) => blockMutation.mutate(id)}
+              onMute={(id) => muteMutation.mutate(id)}
+              onUnmute={(id) => unmuteMutation.mutate(id)}
               removing={removeMutation.isPending}
               blocking={blockMutation.isPending}
+              muting={muteMutation.isPending || unmuteMutation.isPending}
             />
           ))}
         </div>
@@ -321,7 +416,7 @@ export function DashboardPage() {
             <DialogTitle>End meeting?</DialogTitle>
             <DialogDescription>
               This will end the Zoom meeting for all participants. Cloud recording will be processed after the
-              meeting ends.
+              meeting ends and will appear in the Recordings section.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2 pt-4">

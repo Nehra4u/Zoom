@@ -7,7 +7,7 @@ import {
   handleParticipantMuted,
   handleSessionEnded,
 } from '../services/sessionService.js';
-import { isMeetingEventForActiveSession } from '../services/meetingService.js';
+import { isMeetingEventForActiveSession, findMeetingByZoomId } from '../services/meetingService.js';
 import { getIo } from '../services/io.js';
 
 function parseBody(req) {
@@ -32,13 +32,18 @@ async function handleRecordingCompleted(payload, eventTs) {
   const object = payload?.object;
   if (!object?.recording_files?.length) return;
 
+  const meetingId = String(object.uuid ?? object.id ?? '');
+  const relatedMeeting = await findMeetingByZoomId(meetingId);
+
+  const startedBy = relatedMeeting?.startedBy ?? null;
+
   for (const file of object.recording_files) {
     if (file.status !== 'completed') continue;
 
     const recording = await Recording.findOneAndUpdate(
       { zoomRecordingId: file.id },
       {
-        zoomMeetingId: String(object.uuid ?? object.id ?? file.meeting_id),
+        zoomMeetingId: meetingId || String(file.meeting_id ?? ''),
         zoomRecordingId: file.id,
         topic: object.topic ?? 'Meeting Recording',
         startTime: new Date(file.recording_start ?? object.start_time),
@@ -46,6 +51,7 @@ async function handleRecordingCompleted(payload, eventTs) {
         duration: object.duration ?? 0,
         fileType: file.file_type ?? 'MP4',
         fileSize: file.file_size ?? 0,
+        startedBy,
       },
       { upsert: true, new: true }
     );

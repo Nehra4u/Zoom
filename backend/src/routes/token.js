@@ -7,6 +7,11 @@ const router = Router();
 
 router.post('/zoom', authenticateClient, async (req, res) => {
   try {
+    const platform = req.headers['x-client-platform'];
+    if (platform !== 'android') {
+      return res.status(403).json({ error: 'Zoom join tokens are only available on the Android client' });
+    }
+
     const user = await User.findById(req.client.sub);
     if (!user || user.status === 'deleted') {
       return res.status(404).json({ error: 'User not found' });
