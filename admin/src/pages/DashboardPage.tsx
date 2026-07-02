@@ -317,7 +317,12 @@ export function DashboardPage() {
         </Card>
       )}
 
-      <MeetingJoinPanel meetingLive={meetingLive} />
+      <MeetingJoinPanel
+        meetingLive={meetingLive}
+        onMeetingEnded={async () => {
+          await endMutation.mutateAsync()
+        }}
+      />
 
       {sessionQuery.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading session…</p>

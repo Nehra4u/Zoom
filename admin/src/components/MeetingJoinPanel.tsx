@@ -1,23 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import axios from 'axios'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { fetchAdminJoinToken, type AdminJoinCredentials } from '@/api/session'
+import { endMeeting, fetchAdminJoinToken, type AdminJoinCredentials } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface MeetingJoinPanelProps {
   meetingLive: boolean
+  onMeetingEnded?: () => Promise<void>
 }
 
 /**
  * Zoom Meeting SDK Client View runs in an isolated iframe (React 19 incompatible with embedded SDK).
  * Embedded inline on the dashboard so admins can manage participants while in the call.
  */
-export function MeetingJoinPanel({ meetingLive }: MeetingJoinPanelProps) {
+export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPanelProps) {
+  const queryClient = useQueryClient()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const pendingJoinRef = useRef<{ credentials: AdminJoinCredentials; leaveUrl: string } | null>(
     null
   )
+  const endedHandledRef = useRef(false)
   const [joining, setJoining] = useState(false)
   const [inMeeting, setInMeeting] = useState(false)
   const [showFrame, setShowFrame] = useState(false)
@@ -27,28 +32,53 @@ export function MeetingJoinPanel({ meetingLive }: MeetingJoinPanelProps) {
     setInMeeting(false)
     setJoining(false)
     pendingJoinRef.current = null
+    endedHandledRef.current = false
     if (iframeRef.current) {
       iframeRef.current.src = 'about:blank'
     }
   }, [])
 
+  const syncMeetingEnded = useCallback(async () => {
+    try {
+      if (onMeetingEnded) {
+        await onMeetingEnded()
+      } else {
+        await endMeeting()
+        await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+        toast.success('Meeting ended')
+      }
+    } catch (err) {
+      if (!axios.isAxiosError(err) || err.response?.status !== 404) {
+        toast.error(getErrorMessage(err))
+      }
+    }
+  }, [onMeetingEnded, queryClient])
+
   useEffect(() => {
-    if (!meetingLive && (inMeeting || showFrame)) {
+    if (!meetingLive && showFrame) {
       closeFrame()
     }
-  }, [meetingLive, inMeeting, showFrame, closeFrame])
+  }, [meetingLive, showFrame, closeFrame])
 
   useEffect(() => {
     if (!showFrame) return
+
+    async function handlePortalEnd() {
+      if (endedHandledRef.current) return
+      endedHandledRef.current = true
+      closeFrame()
+      await syncMeetingEnded()
+    }
 
     function onMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return
       const iframe = iframeRef.current
       if (!iframe?.contentWindow || event.source !== iframe.contentWindow) return
 
-      const data = event.data as { type?: string; message?: string }
+      const data = event.data as { type?: string; message?: string; ended?: boolean }
 
       if (data.type === 'ZOOM_READY' && pendingJoinRef.current) {
+        setJoining(false)
         iframe.contentWindow.postMessage(
           { type: 'ZOOM_JOIN', ...pendingJoinRef.current },
           window.location.origin
@@ -66,11 +96,15 @@ export function MeetingJoinPanel({ meetingLive }: MeetingJoinPanelProps) {
         setInMeeting(false)
         toast.error(data.message || 'Failed to join meeting')
       }
+
+      if (data.type === 'ZOOM_LEFT' && data.ended) {
+        void handlePortalEnd()
+      }
     }
 
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [showFrame])
+  }, [showFrame, closeFrame, syncMeetingEnded])
 
   useEffect(() => {
     if (!showFrame || !pendingJoinRef.current) return
@@ -81,6 +115,7 @@ export function MeetingJoinPanel({ meetingLive }: MeetingJoinPanelProps) {
 
   const joinInPortal = async () => {
     setJoining(true)
+    endedHandledRef.current = false
     try {
       const credentials = await fetchAdminJoinToken()
       if (!credentials.sdkKey && !credentials.sdkJwt.startsWith('mock-')) {
@@ -97,7 +132,7 @@ export function MeetingJoinPanel({ meetingLive }: MeetingJoinPanelProps) {
 
       pendingJoinRef.current = {
         credentials,
-        leaveUrl: `${window.location.origin}/dashboard`,
+        leaveUrl: `${window.location.origin}/zoom-leave.html`,
       }
       setShowFrame(true)
     } catch (err) {
@@ -118,10 +153,10 @@ export function MeetingJoinPanel({ meetingLive }: MeetingJoinPanelProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {!showFrame ? (
             <Button size="sm" disabled={joining} onClick={() => void joinInPortal()}>
-              {joining ? 'Connecting…' : 'Join in Portal'}
+              {joining ? 'Fetching credentials…' : 'Join in Portal'}
             </Button>
           ) : (
             <Button size="sm" variant="outline" onClick={closeFrame}>
@@ -131,16 +166,11 @@ export function MeetingJoinPanel({ meetingLive }: MeetingJoinPanelProps) {
         </div>
 
         {showFrame && (
-          <div className="relative w-full overflow-hidden rounded-lg border bg-black">
-            {joining && !inMeeting && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/70 text-sm text-white">
-                Connecting to meeting…
-              </div>
-            )}
+          <div className="w-full overflow-hidden rounded-lg border bg-black">
             <iframe
               ref={iframeRef}
               title="Zoom meeting"
-              className="h-[420px] w-full border-0"
+              className="h-[520px] w-full border-0"
               allow="camera; microphone; fullscreen; display-capture; autoplay"
             />
           </div>

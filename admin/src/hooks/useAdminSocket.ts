@@ -53,6 +53,7 @@ export function useAdminSocket(enabled = true) {
 
     socket.on('session:ended', () => {
       clearSession()
+      queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
     })
 
     socket.on('recording:available', (payload: { topic?: string }) => {
