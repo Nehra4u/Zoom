@@ -41,29 +41,49 @@ function connectClient(token, index) {
     socket.on('connect', () => {
       clearTimeout(timeout);
       let forceLeaveReceived = false;
+      let userDeactivatedReceived = false;
       let forceLeaveResolve = null;
+      let userDeactivatedResolve = null;
 
       socket.on('FORCE_LEAVE', () => {
         forceLeaveReceived = true;
         forceLeaveResolve?.(true);
       });
 
+      socket.on('USER_DEACTIVATED', () => {
+        userDeactivatedReceived = true;
+        userDeactivatedResolve?.(true);
+      });
+
       resolve({
         socket,
         index,
         connectMs: Date.now() - start,
-        waitForForceLeave: () =>
-          new Promise((res) => {
-            if (forceLeaveReceived) {
-              res(true);
-              return;
-            }
-            forceLeaveResolve = res;
-            setTimeout(() => {
-              forceLeaveResolve = null;
-              res(forceLeaveReceived);
-            }, 5000);
-          }),
+        waitForDeactivateEvents: () =>
+          Promise.all([
+            new Promise((res) => {
+              if (forceLeaveReceived) {
+                res(true);
+                return;
+              }
+              forceLeaveResolve = res;
+              setTimeout(() => {
+                forceLeaveResolve = null;
+                res(forceLeaveReceived);
+              }, 5000);
+            }),
+            new Promise((res) => {
+              if (userDeactivatedReceived) {
+                res(true);
+                return;
+              }
+              userDeactivatedResolve = res;
+              setTimeout(() => {
+                userDeactivatedResolve = null;
+                res(userDeactivatedReceived);
+              }, 5000);
+            }),
+          ]),
         disconnect: () => socket.disconnect(),
       });
     });
@@ -135,24 +155,24 @@ async function run() {
   console.log(`Admin connected in ${adminConn.connectMs}ms`);
 
   const connectStart = Date.now();
-  const clients = await Promise.all(
-    users.map((_, i) => connectClient(users[i].clientToken, i))
-  );
+  const clients = await Promise.all(users.map((_, i) => connectClient(users[i].clientToken, i)));
   const connectTotalMs = Date.now() - connectStart;
   const avgConnectMs = clients.reduce((s, c) => s + c.connectMs, 0) / clients.length;
   console.log(`All ${CLIENT_COUNT} clients connected in ${connectTotalMs}ms (avg ${avgConnectMs.toFixed(0)}ms)`);
 
   const deactivateStart = Date.now();
-  await Promise.all(
-    users.map((u) => req('POST', `/users/${u.id}/deactivate`, null, adminToken))
-  );
+  await Promise.all(users.map((u) => req('POST', `/users/${u.id}/deactivate`, null, adminToken)));
   console.log(`Deactivate API calls done in ${Date.now() - deactivateStart}ms`);
 
-  const forceLeaveStart = Date.now();
-  const results = await Promise.all(clients.map((c) => c.waitForForceLeave()));
-  const received = results.filter(Boolean).length;
-  const forceLeaveMs = Date.now() - forceLeaveStart;
-  console.log(`FORCE_LEAVE received by ${received}/${CLIENT_COUNT} clients in ${forceLeaveMs}ms`);
+  const eventStart = Date.now();
+  const results = await Promise.all(clients.map((c) => c.waitForDeactivateEvents()));
+  const forceLeaveReceived = results.filter(([fl]) => fl).length;
+  const userDeactivatedReceived = results.filter(([, ud]) => ud).length;
+  const eventMs = Date.now() - eventStart;
+  console.log(
+    `USER_DEACTIVATED received by ${userDeactivatedReceived}/${CLIENT_COUNT} clients in ${eventMs}ms`
+  );
+  console.log(`FORCE_LEAVE received by ${forceLeaveReceived}/${CLIENT_COUNT} clients (legacy)`);
 
   clients.forEach((c) => c.disconnect());
   adminConn.disconnect();
@@ -162,14 +182,14 @@ async function run() {
   }
 
   console.log('\n--- Summary ---');
-  console.log(`Clients:           ${CLIENT_COUNT}`);
-  console.log(`Connect total:     ${connectTotalMs}ms`);
-  console.log(`Connect avg:       ${avgConnectMs.toFixed(0)}ms`);
-  console.log(`FORCE_LEAVE rate:  ${received}/${CLIENT_COUNT} (${((received / CLIENT_COUNT) * 100).toFixed(0)}%)`);
-  console.log(`FORCE_LEAVE time:  ${forceLeaveMs}ms`);
+  console.log(`Clients:                  ${CLIENT_COUNT}`);
+  console.log(`Connect total:            ${connectTotalMs}ms`);
+  console.log(`Connect avg:              ${avgConnectMs.toFixed(0)}ms`);
+  console.log(`USER_DEACTIVATED rate:    ${userDeactivatedReceived}/${CLIENT_COUNT}`);
+  console.log(`FORCE_LEAVE rate (legacy): ${forceLeaveReceived}/${CLIENT_COUNT}`);
 
-  if (received < CLIENT_COUNT * 0.9) {
-    console.error('\n❌ Less than 90% received FORCE_LEAVE');
+  if (userDeactivatedReceived < CLIENT_COUNT * 0.9) {
+    console.error('\n❌ Less than 90% received USER_DEACTIVATED');
     process.exit(1);
   }
 

@@ -1,6 +1,8 @@
 import { SessionState } from '../models/SessionState.js';
 import { User } from '../models/User.js';
 import { getIo } from './io.js';
+import { getClientUserIdsForAdmin } from './clientMeetingPayload.js';
+import { notifySessionEnded } from './notificationService.js';
 import { getLiveMeetingForAdmin, toPublicMeeting } from './meetingService.js';
 import { userScopeQuery } from './adminScope.js';
 
@@ -141,14 +143,31 @@ export async function handleParticipantMuted({ zoomParticipantId, userId, muted 
   return toParticipant(session, user);
 }
 
+async function findMeetingDoc(meetingId) {
+  const { ActiveMeeting } = await import('../models/ActiveMeeting.js');
+  if (!meetingId) return null;
+  return ActiveMeeting.findOne({
+    $or: [
+      { meetingNumber: String(meetingId) },
+      { zoomMeetingUuid: String(meetingId) },
+      { zoomMeetingId: String(meetingId) },
+    ],
+  }).sort({ startedAt: -1 });
+}
+
 export async function handleSessionEnded(meetingId) {
   const query = meetingId ? { meetingId, inCall: true } : { inCall: true };
   await SessionState.updateMany(query, { inCall: false, leftAt: new Date() });
 
+  const meetingDoc = await findMeetingDoc(meetingId);
+  const userIds = meetingDoc?.startedBy
+    ? await getClientUserIdsForAdmin(meetingDoc.startedBy.toString())
+    : [];
+
   const io = getIo();
   if (io) {
     io.of('/admin').to('admin:session').emit('session:ended', { meetingId: meetingId ?? null });
-    io.of('/client').emit('session:ended', { meetingId: meetingId ?? null });
+    notifySessionEnded(userIds, meetingId ?? null);
   }
 
   const { ActiveMeeting } = await import('../models/ActiveMeeting.js');

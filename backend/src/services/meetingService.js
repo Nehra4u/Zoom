@@ -17,7 +17,11 @@ import {
   isMockMode,
   fetchHostZakToken,
 } from './zoomApi.js';
-import { forceLeaveUser, notifySessionStarted } from './notificationService.js';
+import {
+  forceLeaveUser,
+  notifyAdminSessionStarted,
+  notifySessionStarted,
+} from './notificationService.js';
 import { generateZoomSdkJwt } from './zoomTokenService.js';
 
 function toPublicMeeting(doc) {
@@ -170,16 +174,16 @@ export async function startMeeting(actor) {
     },
   });
 
+  const publicMeeting = toPublicMeeting(meeting);
+  notifyAdminSessionStarted(publicMeeting);
+
   const userQuery = { status: 'active', ...userScopeQuery(actor) };
   const activeUsers = await User.find(userQuery);
   for (const user of activeUsers) {
-    notifySessionStarted(user._id.toString(), {
-      meetingNumber: meeting.meetingNumber,
-      password: meeting.password,
-    });
+    await notifySessionStarted(user._id.toString(), user);
   }
 
-  return toPublicMeeting(meeting);
+  return publicMeeting;
 }
 
 export async function endMeeting(actor) {

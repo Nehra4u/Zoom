@@ -34,10 +34,7 @@ export function setupSocket(httpServer) {
 
     const user = await User.findById(userId);
     if (user) {
-      sendStatusSync(socket, {
-        isActive: user.status === 'active',
-        shouldBeInMeeting: user.status === 'active',
-      });
+      await sendStatusSync(socket, user);
     }
 
     socket.on('HEARTBEAT', async (data) => {

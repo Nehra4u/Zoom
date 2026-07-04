@@ -62,11 +62,11 @@ export async function loginClient(email, password, device = {}) {
     await user.save();
   }
 
-  if (user.status === 'inactive') {
+  if (user.status === 'pending') {
     return { success: false, status: 'USER_INACTIVE', message: 'Your account is inactive. Please contact support.' };
   }
 
-  if (user.status === 'deactivated') {
+  if (user.status === 'inactive') {
     return { success: false, status: 'USER_DEACTIVATED', message: 'Your account has been deactivated. Please contact support.' };
   }
 
@@ -162,9 +162,17 @@ export async function refreshClientToken(refreshToken) {
     throw err;
   }
 
-  if (user.status === 'inactive') {
+  if (user.status === 'pending') {
     const err = new Error('Account inactive');
     err.status = 403;
+    err.code = 'USER_INACTIVE';
+    throw err;
+  }
+
+  if (user.status === 'inactive') {
+    const err = new Error('Account deactivated');
+    err.status = 403;
+    err.code = 'USER_DEACTIVATED';
     throw err;
   }
 

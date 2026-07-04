@@ -43,13 +43,26 @@ docker compose up -d
 - `POST /api/session/participants/:userId/remove` — kick from call without blocking account
 - `POST /api/session/dev/simulate` — dev-only event simulator (join/leave/mute/unmute/ended)
 - `POST /api/auth/login|refresh|logout` — APK client auth (for `/client` socket namespace)
+- `POST /api/home` — APK bootstrap: user + live meeting credentials + WebSocket config
 
 ### Socket.io namespaces
 
 | Namespace | Auth | Room | Events |
 |---|---|---|---|
-| `/admin` | Admin JWT | `admin:session` | `participant:joined`, `participant:left`, `participant:muted`, `participant:unmuted`, `session:ended`, `recording:available` |
-| `/client` | Client JWT | `client:{userId}` | `SESSION_STARTED`, `FORCE_LEAVE`, `REJOIN_ALLOWED`, `STATUS_SYNC`, `session:ended` |
+| `/admin` | Admin JWT | `admin:session` | `session:started`, `participant:joined`, `participant:left`, `participant:muted`, `participant:unmuted`, `session:ended`, `recording:available` |
+| `/client` | Client JWT | `client:{userId}` | `STATUS_SYNC`, `SESSION_STARTED`, `USER_ACTIVATED`, `USER_DEACTIVATED`, `SESSION_ENDED` (+ legacy `FORCE_LEAVE`, `REJOIN_ALLOWED`, `session:ended`) |
+
+### `/api/home` response (APK bootstrap)
+
+```json
+{
+  "success": true,
+  "currentStatus": "SUCCESS | NO_MEETING_ASSIGNED | USER_INACTIVE | USER_DEACTIVATED",
+  "user": { "uId", "name", "phone", "uStatus" },
+  "meeting": { "meetingId", "meetingPassword", "meetingHostUrl", "jwtToken" },
+  "websocket": { "url": "ws(s)://host/client", "hbInterval": 10 }
+}
+```
 
 ## Phase 4 — Zoom Integration
 
@@ -77,3 +90,4 @@ npm run zoom:check    # verify Zoom OAuth + print webhook URL
 - Smoke tests: `npm run test:smoke`
 - Full E2E (spec flows 27 & 28): `npm run test:e2e`
 - WebSocket load test: `CLIENTS=20 npm run test:ws-load`
+- WebSocket client lifecycle: `npm run test:ws-client`

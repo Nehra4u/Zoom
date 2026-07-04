@@ -1,87 +1,17 @@
 import { User } from '../models/User.js';
-import { DeviceSession } from '../models/DeviceSession.js';
-import { getLiveMeetingForAdmin } from './meetingService.js';
+import { buildHomeResponse } from './clientMeetingPayload.js';
 
 export async function getHomeData(userId, deviceId) {
   const user = await User.findById(userId);
-
-  if (!user || user.status === 'deleted') {
-    return { success: false, status: 'SESSION_EXPIRED', message: 'Your session has expired. Please login again.' };
-  }
-
-  if (user.status === 'inactive') {
-    return { success: false, status: 'USER_INACTIVE', message: 'Your account is inactive. Please contact support.' };
-  }
-
-  if (user.status === 'deactivated') {
-    return { success: false, status: 'USER_DEACTIVATED', message: 'Your account has been deactivated. Please contact support.' };
-  }
-
-  // Validate device if provided
-  if (deviceId) {
-    const session = await DeviceSession.findOne({ userId, active: true, loggedOut: false });
-    if (session && session.deviceId !== deviceId) {
-      return {
-        success: false,
-        status: 'DEVICE_CONFLICT',
-        message: 'This account is active on another device.',
-      };
-    }
-    if (!session) {
-      return { success: false, status: 'LOGGED_OUT', message: 'You have been logged out. Please login again.' };
-    }
-    // Update lastSeenAt
-    await DeviceSession.updateOne({ _id: session._id }, { lastSeenAt: new Date() });
-  }
-
-  const publicUrl = (process.env.PUBLIC_API_URL || `http://localhost:${process.env.PORT || 3001}`).replace(/\/$/, '');
-
-  const liveMeeting = await getLiveMeetingForAdmin(user.createdBy?.toString());
-  const meetingForUser = liveMeeting ?? null;
-
-  if (!meetingForUser) {
+  if (!user) {
     return {
-      success: true,
-      status: liveMeeting ? 'NO_MEETING_ASSIGNED' : 'NO_MEETING_ASSIGNED',
-      message: liveMeeting
-        ? 'No meeting has been assigned to you yet.'
-        : 'No meeting has been assigned yet.',
-      user: {
-        userId: user._id.toString(),
-        name: user.name,
-        phone: user.phone ?? null,
-        active: true,
-      },
+      success: false,
+      currentStatus: 'SESSION_EXPIRED',
+      user: null,
       meeting: null,
-      websocket: {
-        url: `${publicUrl}/client`,
-        heartbeatIntervalSeconds: 10,
-      },
+      websocket: null,
+      message: 'Your session has expired. Please login again.',
     };
   }
-
-  return {
-    success: true,
-    status: 'SUCCESS',
-    message: 'Home data loaded successfully.',
-    user: {
-      userId: user._id.toString(),
-      name: user.name,
-      phone: user.phone ?? null,
-      active: true,
-    },
-    meeting: {
-      meetingId: meetingForUser.meetingNumber,
-      meetingPassword: meetingForUser.password ?? '',
-      sdkKey: process.env.ZOOM_SDK_KEY ?? null,
-      title: meetingForUser.topic ?? 'ZoomControl Session',
-      hostName: meetingForUser.hostDisplayName ?? 'Admin',
-      startsAt: meetingForUser.startedAt?.toISOString() ?? null,
-      timezone: 'Asia/Kolkata',
-    },
-    websocket: {
-      url: `${publicUrl}/client`,
-      heartbeatIntervalSeconds: 10,
-    },
-  };
+  return buildHomeResponse(user, deviceId);
 }

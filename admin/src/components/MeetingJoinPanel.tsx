@@ -4,7 +4,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { endMeeting, fetchAdminJoinToken, type AdminJoinCredentials } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface MeetingJoinPanelProps {
@@ -14,7 +13,7 @@ interface MeetingJoinPanelProps {
 
 /**
  * Zoom Meeting SDK Client View runs in an isolated iframe (React 19 incompatible with embedded SDK).
- * Embedded inline on the dashboard so admins can manage participants while in the call.
+ * Joins automatically when the meeting is live so admins can manage participants while in the call.
  */
 export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPanelProps) {
   const queryClient = useQueryClient()
@@ -23,13 +22,12 @@ export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPan
     null
   )
   const endedHandledRef = useRef(false)
+  const joinAttemptedRef = useRef(false)
   const [joining, setJoining] = useState(false)
-  const [inMeeting, setInMeeting] = useState(false)
   const [showFrame, setShowFrame] = useState(false)
 
   const closeFrame = useCallback(() => {
     setShowFrame(false)
-    setInMeeting(false)
     setJoining(false)
     pendingJoinRef.current = null
     endedHandledRef.current = false
@@ -55,8 +53,9 @@ export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPan
   }, [onMeetingEnded, queryClient])
 
   useEffect(() => {
-    if (!meetingLive && showFrame) {
-      closeFrame()
+    if (!meetingLive) {
+      joinAttemptedRef.current = false
+      if (showFrame) closeFrame()
     }
   }, [meetingLive, showFrame, closeFrame])
 
@@ -86,14 +85,13 @@ export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPan
       }
 
       if (data.type === 'ZOOM_JOINED') {
-        setInMeeting(true)
         setJoining(false)
         toast.success('Joined meeting in portal')
       }
 
       if (data.type === 'ZOOM_ERROR') {
         setJoining(false)
-        setInMeeting(false)
+        joinAttemptedRef.current = false
         toast.error(data.message || 'Failed to join meeting')
       }
 
@@ -113,7 +111,9 @@ export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPan
     iframe.src = `/zoom-join.html?t=${Date.now()}`
   }, [showFrame])
 
-  const joinInPortal = async () => {
+  const joinInPortal = useCallback(async () => {
+    if (joining || showFrame) return
+
     setJoining(true)
     endedHandledRef.current = false
     try {
@@ -121,12 +121,14 @@ export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPan
       if (!credentials.sdkKey && !credentials.sdkJwt.startsWith('mock-')) {
         toast.error('Zoom SDK is not configured on the server')
         setJoining(false)
+        joinAttemptedRef.current = false
         return
       }
 
       if (credentials.sdkJwt.startsWith('mock-')) {
         toast.error('In-portal join requires real Zoom SDK credentials (not mock mode)')
         setJoining(false)
+        joinAttemptedRef.current = false
         return
       }
 
@@ -136,10 +138,17 @@ export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPan
       }
       setShowFrame(true)
     } catch (err) {
+      joinAttemptedRef.current = false
       closeFrame()
       toast.error(getErrorMessage(err))
     }
-  }
+  }, [joining, showFrame, closeFrame])
+
+  useEffect(() => {
+    if (!meetingLive || showFrame || joining || joinAttemptedRef.current) return
+    joinAttemptedRef.current = true
+    void joinInPortal()
+  }, [meetingLive, showFrame, joining, joinInPortal])
 
   if (!meetingLive) return null
 
@@ -148,22 +157,14 @@ export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPan
       <CardHeader>
         <CardTitle>In-portal meeting</CardTitle>
         <CardDescription>
-          Join inside the dashboard while managing participants below. You appear as{' '}
-          <strong>your admin name</strong>.
+          You join automatically when the meeting starts. Manage participants below while in the call
+          — you appear as <strong>your admin name</strong>.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2">
-          {!showFrame ? (
-            <Button size="sm" disabled={joining} onClick={() => void joinInPortal()}>
-              {joining ? 'Fetching credentials…' : 'Join in Portal'}
-            </Button>
-          ) : (
-            <Button size="sm" variant="outline" onClick={closeFrame}>
-              {inMeeting ? 'Leave meeting view' : 'Cancel join'}
-            </Button>
-          )}
-        </div>
+        {joining && !showFrame && (
+          <p className="text-sm text-muted-foreground">Joining meeting in portal…</p>
+        )}
 
         {showFrame && (
           <div className="w-full overflow-hidden rounded-lg border bg-black">

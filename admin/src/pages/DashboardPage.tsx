@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import {
-  ExternalLink,
   Mic,
   MicOff,
   PhoneOff,
@@ -17,7 +16,6 @@ import { toast } from 'sonner'
 import {
   endMeeting,
   fetchCurrentSession,
-  fetchMeetingJoinUrl,
   muteParticipant,
   removeParticipantFromCall,
   simulateSessionEvent,
@@ -145,7 +143,7 @@ export function DashboardPage() {
   const sessionQuery = useQuery({
     queryKey: ['session', 'current'],
     queryFn: fetchCurrentSession,
-    refetchInterval: 15_000,
+    refetchInterval: socketConnected ? false : 30_000,
   })
 
   const usersQuery = useQuery({
@@ -183,20 +181,6 @@ export function DashboardPage() {
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
-  const joinBrowserMutation = useMutation({
-    mutationFn: fetchMeetingJoinUrl,
-    onSuccess: (joinInfo) => {
-      const url = joinInfo.startUrl ?? joinInfo.joinUrl
-      if (!url) {
-        toast.error('No join URL available for this meeting')
-        return
-      }
-      window.open(url, '_blank', 'noopener,noreferrer')
-      toast.success('Opening meeting in browser')
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  })
-
   const removeMutation = useMutation({
     mutationFn: removeParticipantFromCall,
     onSuccess: () => {
@@ -229,7 +213,7 @@ export function DashboardPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       invalidateSession()
-      toast.success('User blocked and removed from call')
+      toast.success('User deactivated and removed from call')
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -269,15 +253,6 @@ export function DashboardPage() {
             </Button>
           ) : (
             <>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={joinBrowserMutation.isPending}
-                onClick={() => joinBrowserMutation.mutate()}
-              >
-                <ExternalLink className="h-4 w-4" />
-                Join in Browser
-              </Button>
               <Button
                 size="sm"
                 variant="destructive"

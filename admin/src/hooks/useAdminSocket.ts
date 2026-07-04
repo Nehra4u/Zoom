@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getStoredAccessToken } from '@/api/client'
 import { useSessionStore } from '@/stores/sessionStore'
-import type { SessionParticipant } from '@/types/session'
+import type { ActiveMeeting, SessionParticipant } from '@/types/session'
 
 export function useAdminSocket(enabled = true) {
   const socketRef = useRef<Socket | null>(null)
@@ -14,6 +14,7 @@ export function useAdminSocket(enabled = true) {
     removeParticipant,
     updateMute,
     clearSession,
+    setMeetingStarted,
     setSocketConnected,
   } = useSessionStore()
 
@@ -31,9 +32,18 @@ export function useAdminSocket(enabled = true) {
 
     socketRef.current = socket
 
-    socket.on('connect', () => setSocketConnected(true))
+    socket.on('connect', () => {
+      setSocketConnected(true)
+      queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+    })
     socket.on('disconnect', () => setSocketConnected(false))
     socket.on('connect_error', () => setSocketConnected(false))
+
+    socket.on('session:started', (payload: { meeting: ActiveMeeting }) => {
+      if (payload?.meeting) {
+        setMeetingStarted(payload.meeting)
+      }
+    })
 
     socket.on('participant:joined', (payload: SessionParticipant) => {
       upsertParticipant({ ...payload, inCall: true })
@@ -84,6 +94,7 @@ export function useAdminSocket(enabled = true) {
     removeParticipant,
     updateMute,
     clearSession,
+    setMeetingStarted,
     setSocketConnected,
     queryClient,
   ])

@@ -2,9 +2,14 @@ import bcrypt from 'bcrypt';
 import { User } from '../models/User.js';
 import { SessionState } from '../models/SessionState.js';
 import { writeAuditLog } from './auditService.js';
-import { forceLeaveUser, notifyRejoinAllowed } from './notificationService.js';
+import {
+  forceLeaveUser,
+  notifySessionStarted,
+  notifyUserActivated,
+  notifyUserDeactivated,
+} from './notificationService.js';
 import { handleParticipantLeft } from './sessionService.js';
-import { issueZoomCredentialsForUser, revokeOutstandingUserToken } from './zoomTokenService.js';
+import { revokeOutstandingUserToken } from './zoomTokenService.js';
 import { getUserForAdmin, userScopeQuery } from './adminScope.js';
 
 function toPublicUser(user) {
@@ -122,12 +127,7 @@ export async function activateUser(id, actor) {
     targetUserId: user._id,
   });
 
-  const credentials = await issueZoomCredentialsForUser(user, actor);
-  notifyRejoinAllowed(user._id.toString(), {
-    sdkJwt: credentials.sdkJwt,
-    meetingNumber: credentials.meetingNumber,
-    password: credentials.password,
-  });
+  await notifyUserActivated(user._id.toString(), user);
 
   return toPublicUser(user);
 }
@@ -157,6 +157,7 @@ export async function deactivateUser(id, actor) {
 
   await revokeOutstandingUserToken(user, actor);
 
+  notifyUserDeactivated(user._id.toString());
   forceLeaveUser(user._id.toString());
 
   const activeSession = await SessionState.findOne({ userId: user._id, inCall: true });

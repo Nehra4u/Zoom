@@ -762,10 +762,19 @@ socket.io server
 │
 └── Namespace: /client
     └── Room: client:{userId}         ← Each APK client in their own room
-        Events emitted:
-        - FORCE_LEAVE
-        - REJOIN_ALLOWED
-        - STATUS_SYNC
+        Auth: client JWT via socket.handshake.auth.token
+        Events emitted (server → app):
+        - STATUS_SYNC          ← on every connect/reconnect (reconciliation)
+        - SESSION_STARTED      ← meeting started or rejoin allowed
+        - USER_ACTIVATED       ← admin activated account (includes meeting if live)
+        - USER_DEACTIVATED     ← admin deactivated account
+        - SESSION_ENDED        ← live meeting ended
+        Legacy (dual-emitted for older APK builds):
+        - FORCE_LEAVE          ← kick or deactivate (deprecated)
+        - REJOIN_ALLOWED       ← activate with live meeting (deprecated)
+        - session:ended        ← meeting ended (deprecated)
+        Events sent (app → server):
+        - HEARTBEAT            ← every ~10s; server replies with HEARTBEAT_ACK
 ```
 
 ### Backend WebSocket Setup

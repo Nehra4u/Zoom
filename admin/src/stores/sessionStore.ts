@@ -13,6 +13,7 @@ interface SessionStore {
     meetingLive?: boolean
     meeting?: ActiveMeeting | null
   }) => void
+  setMeetingStarted: (meeting: ActiveMeeting) => void
   setSocketConnected: (connected: boolean) => void
   upsertParticipant: (participant: SessionParticipant) => void
   removeParticipant: (userId: string) => void
@@ -34,6 +35,13 @@ export const useSessionStore = create<SessionStore>((set) => ({
       sessionActive,
       meetingLive: meetingLive ?? false,
       meeting: meeting ?? null,
+    }),
+
+  setMeetingStarted: (meeting) =>
+    set({
+      meetingLive: true,
+      meeting,
+      sessionActive: true,
     }),
 
   setSocketConnected: (socketConnected) => set({ socketConnected }),

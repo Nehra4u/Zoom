@@ -82,7 +82,8 @@ export function UserDetailPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       queryClient.invalidateQueries({ queryKey: ['users', id] })
-      toast.success('User deactivated — force-leave sent')
+      queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+      toast.success('User deactivated — client notified')
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })

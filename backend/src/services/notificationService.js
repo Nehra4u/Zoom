@@ -1,27 +1,38 @@
 import { getIo } from './io.js';
+import { buildClientMeetingPayload, buildClientStatusPayload } from './clientMeetingPayload.js';
 
-export function notifySessionStarted(userId, credentials = {}) {
+function clientRoom(userId) {
+  return `client:${userId}`;
+}
+
+export async function notifySessionStarted(userId, user) {
+  const meeting = await buildClientMeetingPayload(user);
+  const payload = {
+    ...(meeting ?? {}),
+    meetingNumber: meeting?.meetingId ?? null,
+    password: meeting?.meetingPassword ?? null,
+    message: meeting
+      ? 'A meeting has started. Join now.'
+      : 'A meeting has started. Request your join token to enter.',
+  };
+
   const io = getIo();
   if (!io) {
-    console.log(`[notification] SESSION_STARTED → client:${userId}`, credentials);
+    console.log(`[notification] SESSION_STARTED → ${clientRoom(userId)}`, payload);
     return;
   }
 
-  io.of('/client').to(`client:${userId}`).emit('SESSION_STARTED', {
-    meetingNumber: credentials.meetingNumber ?? null,
-    password: credentials.password ?? null,
-    message: 'A meeting has started. Request your join token to enter.',
-  });
+  io.of('/client').to(clientRoom(userId)).emit('SESSION_STARTED', payload);
 }
 
 export function forceLeaveUser(userId, reason = 'account_deactivated') {
   const io = getIo();
   if (!io) {
-    console.log(`[notification] FORCE_LEAVE → client:${userId}`, { reason });
+    console.log(`[notification] FORCE_LEAVE → ${clientRoom(userId)}`, { reason });
     return;
   }
 
-  io.of('/client').to(`client:${userId}`).emit('FORCE_LEAVE', {
+  io.of('/client').to(clientRoom(userId)).emit('FORCE_LEAVE', {
     reason,
     message:
       reason === 'account_deactivated'
@@ -35,50 +46,97 @@ export function forceLeaveUser(userId, reason = 'account_deactivated') {
 export function notifyRejoinAllowed(userId, credentials = {}) {
   const io = getIo();
   if (!io) {
-    console.log(`[notification] REJOIN_ALLOWED → client:${userId}`, credentials);
+    console.log(`[notification] REJOIN_ALLOWED → ${clientRoom(userId)}`, credentials);
     return;
   }
 
-  io.of('/client').to(`client:${userId}`).emit('REJOIN_ALLOWED', {
-    meetingToken: credentials.sdkJwt ?? null,
-    meetingNumber: credentials.meetingNumber ?? null,
-    password: credentials.password ?? null,
+  io.of('/client').to(clientRoom(userId)).emit('REJOIN_ALLOWED', {
+    meetingToken: credentials.sdkJwt ?? credentials.jwtToken ?? null,
+    meetingNumber: credentials.meetingNumber ?? credentials.meetingId ?? null,
+    password: credentials.password ?? credentials.meetingPassword ?? null,
     pending: credentials.pending ?? false,
   });
 }
 
-export function sendStatusSync(socket, { isActive, shouldBeInMeeting }) {
-  socket.emit('STATUS_SYNC', { isActive, shouldBeInMeeting });
+export async function sendStatusSync(socket, user) {
+  const payload = await buildClientStatusPayload(user);
+  socket.emit('STATUS_SYNC', payload);
 }
 
-// ─── New events for Android client flow ───────────────────────────────────────
+export async function notifyUserActivated(userId, user) {
+  const statusPayload = await buildClientStatusPayload(user);
+  const meeting = statusPayload.shouldBeInMeeting
+    ? {
+        meetingId: statusPayload.meetingId,
+        meetingPassword: statusPayload.meetingPassword,
+        meetingHostUrl: statusPayload.meetingHostUrl,
+        jwtToken: statusPayload.jwtToken,
+      }
+    : null;
 
-export function forceLogoutUser(userId, reason = 'SESSION_REVOKED') {
   const io = getIo();
   if (!io) {
-    console.log(`[notification] FORCE_LOGOUT → client:${userId}`, { reason });
+    console.log(`[notification] USER_ACTIVATED → ${clientRoom(userId)}`, meeting);
     return;
   }
 
-  io.of('/client').to(`client:${userId}`).emit('FORCE_LOGOUT', {
-    type: 'FORCE_LOGOUT',
-    status: 'LOGGED_OUT',
-    reason,
-    message: 'You have been logged out. Please login again.',
-  });
+  io.of('/client').to(clientRoom(userId)).emit('USER_ACTIVATED', meeting ?? {});
+
+  if (meeting) {
+    notifyRejoinAllowed(userId, {
+      sdkJwt: meeting.jwtToken,
+      meetingNumber: meeting.meetingId,
+      password: meeting.meetingPassword,
+    });
+  }
 }
 
 export function notifyUserDeactivated(userId) {
   const io = getIo();
   if (!io) {
-    console.log(`[notification] USER_DEACTIVATED → client:${userId}`);
+    console.log(`[notification] USER_DEACTIVATED → ${clientRoom(userId)}`);
     return;
   }
 
-  io.of('/client').to(`client:${userId}`).emit('USER_DEACTIVATED', {
-    type: 'USER_DEACTIVATED',
-    status: 'USER_DEACTIVATED',
-    message: 'Your account has been deactivated. Please contact support.',
+  io.of('/client').to(clientRoom(userId)).emit('USER_DEACTIVATED', {});
+}
+
+export function notifyAdminSessionStarted(meeting) {
+  const io = getIo();
+  if (!io) {
+    console.log('[notification] session:started → admin:session', meeting);
+    return;
+  }
+
+  io.of('/admin').to('admin:session').emit('session:started', { meeting });
+}
+
+export function notifySessionEnded(userIds, meetingId = null) {
+  const io = getIo();
+  if (!io) {
+    console.log(`[notification] SESSION_ENDED → ${userIds.length} client(s)`, { meetingId });
+    return;
+  }
+
+  const clientNS = io.of('/client');
+  for (const userId of userIds) {
+    clientNS.to(clientRoom(userId)).emit('SESSION_ENDED');
+    clientNS.to(clientRoom(userId)).emit('session:ended', { meetingId: meetingId ?? null });
+  }
+}
+
+export function forceLogoutUser(userId, reason = 'SESSION_REVOKED') {
+  const io = getIo();
+  if (!io) {
+    console.log(`[notification] FORCE_LOGOUT → ${clientRoom(userId)}`, { reason });
+    return;
+  }
+
+  io.of('/client').to(clientRoom(userId)).emit('FORCE_LOGOUT', {
+    type: 'FORCE_LOGOUT',
+    status: 'LOGGED_OUT',
+    reason,
+    message: 'You have been logged out. Please login again.',
   });
 }
 
