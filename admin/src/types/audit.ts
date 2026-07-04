@@ -13,6 +13,8 @@ export type AuditAction =
   | 'token_issued'
   | 'token_revoked'
   | 'recording_accessed'
+  | 'recording_removed'
+  | 'settings_updated'
 
 export interface AuditLogEntry {
   id: string

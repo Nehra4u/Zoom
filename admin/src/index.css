@@ -72,5 +72,28 @@ h1, h2, h3, h4 {
 }
 
 #root {
-  min-height: 100svh;
+  height: 100svh;
+  overflow: hidden;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--muted)) 0%,
+    hsl(var(--muted) / 0.55) 40%,
+    hsl(var(--secondary) / 0.35) 50%,
+    hsl(var(--muted) / 0.55) 60%,
+    hsl(var(--muted)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
 }

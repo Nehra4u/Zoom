@@ -1,6 +1,5 @@
 import crypto from 'crypto';
 import { User } from '../models/User.js';
-import { Recording } from '../models/Recording.js';
 import {
   handleParticipantJoined,
   handleParticipantLeft,
@@ -34,30 +33,26 @@ async function handleRecordingCompleted(payload, eventTs) {
 
   const meetingId = String(object.uuid ?? object.id ?? '');
   const relatedMeeting = await findMeetingByZoomId(meetingId);
-
   const startedBy = relatedMeeting?.startedBy ?? null;
 
+  const { upsertRecordingFile } = await import('../services/recordingService.js');
+
   for (const file of object.recording_files) {
-    if (file.status !== 'completed') continue;
+    const recording = await upsertRecordingFile({
+      zoomMeetingId: meetingId,
+      topic: object.topic,
+      duration: object.duration,
+      file,
+      startedBy,
+    });
 
-    const recording = await Recording.findOneAndUpdate(
-      { zoomRecordingId: file.id },
-      {
-        zoomMeetingId: meetingId || String(file.meeting_id ?? ''),
-        zoomRecordingId: file.id,
-        topic: object.topic ?? 'Meeting Recording',
-        startTime: new Date(file.recording_start ?? object.start_time),
-        endTime: file.recording_end ? new Date(file.recording_end) : null,
-        duration: object.duration ?? 0,
-        fileType: file.file_type ?? 'MP4',
-        fileSize: file.file_size ?? 0,
-        startedBy,
-      },
-      { upsert: true, new: true }
-    );
-
-    emitRecordingAvailable(recording);
+    if (recording) {
+      emitRecordingAvailable(recording);
+    }
   }
+
+  const { enforceRecordingRetention } = await import('../services/recordingRetentionService.js');
+  await enforceRecordingRetention();
 
   void eventTs;
 }

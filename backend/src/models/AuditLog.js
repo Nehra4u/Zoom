@@ -21,6 +21,8 @@ const auditLogSchema = new mongoose.Schema(
         'token_issued',
         'token_revoked',
         'recording_accessed',
+        'recording_removed',
+        'settings_updated',
         'meeting_started',
         'meeting_ended',
         'participant_removed',

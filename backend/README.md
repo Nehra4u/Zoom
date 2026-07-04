@@ -70,6 +70,7 @@ docker compose up -d
 - `POST /api/webhooks/dev/simulate` — dev-only webhook simulator
 - `POST /api/token/zoom` — APK client Zoom SDK JWT (client JWT required)
 - `GET /api/recordings` — recording metadata list
+- `POST /api/recordings/sync` — import cloud recordings from Zoom (last 30 days)
 - `GET /api/recordings/:id/play-url` — fresh play URL from Zoom API
 
 Set `ZOOM_MOCK=true` in `.env` to run without real Zoom credentials.

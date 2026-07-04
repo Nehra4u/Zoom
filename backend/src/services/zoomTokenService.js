@@ -5,7 +5,9 @@ import { User } from '../models/User.js';
 import { getMeetingCredentials } from './zoomApi.js';
 import { writeAuditLog } from './auditService.js';
 
-const SDK_TTL_SEC = 20 * 60;
+/** Zoom requires exp/tokenExp at least 1800s after iat; sample uses 2h. */
+const SDK_TTL_SEC = 2 * 60 * 60;
+const IAT_CLOCK_SKEW_SEC = 30;
 
 export function generateZoomSdkJwt(meetingNumber, role = 0) {
   const sdkKey = process.env.ZOOM_SDK_KEY;
@@ -25,7 +27,7 @@ export function generateZoomSdkJwt(meetingNumber, role = 0) {
     throw err;
   }
 
-  const iat = Math.floor(Date.now() / 1000);
+  const iat = Math.floor(Date.now() / 1000) - IAT_CLOCK_SKEW_SEC;
   const exp = iat + SDK_TTL_SEC;
   const jti = crypto.randomUUID();
 

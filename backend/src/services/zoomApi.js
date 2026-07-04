@@ -190,7 +190,8 @@ export async function fetchMeetingRecordings(meetingId) {
   }
 
   const token = await getZoomAccessToken();
-  const response = await fetch(`https://api.zoom.us/v2/meetings/${encodeURIComponent(meetingId)}/recordings`, {
+  const encodedId = encodeMeetingUuid(String(meetingId));
+  const response = await fetch(`https://api.zoom.us/v2/meetings/${encodedId}/recordings`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -200,6 +201,106 @@ export async function fetchMeetingRecordings(meetingId) {
   }
 
   return response.json();
+}
+
+export async function fetchUserRecordings(userId, { from, to, pageSize = 30, nextPageToken = '' } = {}) {
+  if (isMockMode()) {
+    return {
+      from,
+      to,
+      page_count: 1,
+      page_size: pageSize,
+      total_records: 1,
+      meetings: [
+        {
+          uuid: 'mock-meeting-uuid',
+          id: 123456789,
+          topic: 'Mock Synced Recording',
+          start_time: new Date().toISOString(),
+          duration: 120,
+          recording_files: [
+            {
+              id: 'mock-rec-sync-1',
+              meeting_id: '123456789',
+              recording_start: new Date().toISOString(),
+              recording_end: new Date().toISOString(),
+              file_type: 'MP4',
+              file_size: 2048000,
+              status: 'completed',
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  const token = await getZoomAccessToken();
+  const params = new URLSearchParams({
+    from,
+    to,
+    page_size: String(pageSize),
+  });
+  if (nextPageToken) {
+    params.set('next_page_token', nextPageToken);
+  }
+
+  const response = await fetch(
+    `https://api.zoom.us/v2/users/${encodeURIComponent(userId)}/recordings?${params}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Zoom user recordings fetch failed: ${response.status} ${text}`);
+  }
+
+  return response.json();
+}
+
+export async function deleteCloudRecordingFile(meetingId, recordingId) {
+  if (isMockMode()) return { deleted: true, mock: true };
+
+  const token = await getZoomAccessToken();
+  const encodedMeeting = encodeMeetingUuid(String(meetingId));
+  const response = await fetch(
+    `https://api.zoom.us/v2/meetings/${encodedMeeting}/recordings/${encodeURIComponent(recordingId)}?action=delete`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  if (response.status === 404) return { deleted: false, notFound: true };
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Zoom delete recording failed: ${response.status} ${text}`);
+  }
+
+  return { deleted: true };
+}
+
+export async function deleteAllCloudRecordingsForMeeting(meetingId) {
+  if (isMockMode()) return { deleted: true, mock: true };
+
+  const token = await getZoomAccessToken();
+  const encodedMeeting = encodeMeetingUuid(String(meetingId));
+  const response = await fetch(
+    `https://api.zoom.us/v2/meetings/${encodedMeeting}/recordings?action=delete`,
+    {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+
+  if (response.status === 404) return { deleted: false, notFound: true };
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Zoom delete meeting recordings failed: ${response.status} ${text}`);
+  }
+
+  return { deleted: true };
 }
 
 export async function getMeetingCredentials() {

@@ -24,6 +24,8 @@ const ACTION_LABELS: Record<string, string> = {
   token_issued: 'Token issued',
   token_revoked: 'Token revoked',
   recording_accessed: 'Recording accessed',
+  recording_removed: 'Recording removed',
+  settings_updated: 'Settings updated',
   meeting_started: 'Meeting started',
   meeting_ended: 'Meeting ended',
   participant_removed: 'Participant removed',
