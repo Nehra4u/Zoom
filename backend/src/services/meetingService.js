@@ -360,4 +360,4 @@ export async function setParticipantMuted(userId, muted, actor) {
   return { ok: true, isMuted: muted };
 }
 
-export { toPublicMeeting };
+export { toPublicMeeting, resolveHostUserId };

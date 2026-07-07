@@ -15,10 +15,12 @@ import homeRoutes from './routes/home.js';
 import webhookRoutes from './routes/webhooks.js';
 import tokenRoutes from './routes/token.js';
 import recordingRoutes from './routes/recordings.js';
+import settingsRoutes from './routes/settings.js';
 import auditLogRoutes from './routes/auditLogs.js';
 import { setupSocket } from './socket/index.js';
 import { handleZoomWebhookEvent } from './webhooks/zoom.js';
 import { startReconciliationJob, getReconciliationStatus } from './services/reconciliationService.js';
+import { startRecordingRetentionJob } from './services/settingsService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -75,6 +77,7 @@ app.use('/api', homeRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/token', tokenRoutes);
 app.use('/api/recordings', recordingRoutes);
+app.use('/api/settings', settingsRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 
 app.use((_req, res) => {
@@ -92,6 +95,7 @@ async function start() {
   await connectDb();
   setupSocket(httpServer);
   startReconciliationJob();
+  startRecordingRetentionJob();
   httpServer.listen(port, () => {
     console.log(`Backend listening on http://localhost:${port}`);
   });

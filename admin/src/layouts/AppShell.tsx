@@ -146,6 +146,7 @@ export function AppShell() {
   }, [])
 
   return (
+<<<<<<< HEAD
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Left Sidebar */}
       <aside className="flex h-screen w-[260px] shrink-0 flex-col border-r border-border bg-card">
@@ -153,12 +154,22 @@ export function AppShell() {
         <div className="flex h-16 items-center gap-3 border-b border-border px-5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-chart-1">
             <Video className="h-5 w-5 text-primary-foreground" />
+=======
+    <div className="flex h-svh overflow-hidden">
+      <aside className="flex h-full w-64 shrink-0 flex-col border-r bg-card">
+        <div className="flex shrink-0 items-center gap-2 px-6 py-5">
+          <Video className="h-6 w-6 text-destructive" />
+          <div>
+            <p className="font-mono text-sm font-semibold">ZoomControl</p>
+            <p className="text-xs text-muted-foreground">Admin Portal</p>
+>>>>>>> 442b6025946742ec093718b234a05ff215321ca3
           </div>
           <span className="text-[15px] font-semibold tracking-tight text-foreground">ZoomMeets</span>
           <span className="ml-auto rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">
             Live
           </span>
         </div>
+<<<<<<< HEAD
 
         {/* Search */}
         <div className="px-4 py-4">
@@ -252,9 +263,47 @@ export function AppShell() {
                 {isSuperAdmin ? 'Super Admin' : 'Admin'}
               </span>
             </div>
+=======
+        <Separator className="shrink-0" />
+        <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-4">
+          <NavLink to="/dashboard" className={navLinkClass}>
+            <LayoutDashboard className="h-4 w-4" />
+            Dashboard
+          </NavLink>
+          <NavLink to="/users" className={navLinkClass}>
+            <Users className="h-4 w-4" />
+            Users
+          </NavLink>
+          <NavLink to="/recordings" className={navLinkClass}>
+            <Film className="h-4 w-4" />
+            Recordings
+          </NavLink>
+          <NavLink to="/audit-logs" className={navLinkClass}>
+            <ClipboardList className="h-4 w-4" />
+            Audit Log
+          </NavLink>
+          <NavLink to="/system" className={navLinkClass}>
+            <Server className="h-4 w-4" />
+            System
+          </NavLink>
+          {isSuperAdmin && (
+            <NavLink to="/admins" className={navLinkClass}>
+              <Shield className="h-4 w-4" />
+              Admins
+            </NavLink>
+          )}
+        </nav>
+        <Separator className="shrink-0" />
+        <div className="shrink-0 p-4">
+          <div className="mb-3 rounded-md bg-muted/50 px-3 py-2">
+            <p className="truncate text-sm font-medium">{admin?.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{admin?.email}</p>
+            <p className="mt-1 font-mono text-xs capitalize text-destructive">{admin?.role?.replace('_', ' ')}</p>
+>>>>>>> 442b6025946742ec093718b234a05ff215321ca3
           </div>
         </div>
       </aside>
+<<<<<<< HEAD
 
       {/* Main Content */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -295,6 +344,10 @@ export function AppShell() {
           </div>
         </header>
         <div className="flex-1 overflow-y-auto p-6">
+=======
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+        <div className="flex-1 overflow-y-auto p-8">
+>>>>>>> 442b6025946742ec093718b234a05ff215321ca3
           <Outlet />
         </div>
       </main>
