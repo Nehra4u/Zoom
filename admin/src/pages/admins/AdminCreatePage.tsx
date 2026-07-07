@@ -34,10 +34,6 @@ export function AdminCreatePage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Create admin</h1>
-        <p className="text-muted-foreground">Add a new portal admin account</p>
-      </div>
       <Card>
         <CardHeader>
           <CardTitle>Account details</CardTitle>

@@ -7,6 +7,7 @@ import {
   deleteUser,
   getUserById,
   listUsers,
+  logoutUserDevices,
   updateUser,
 } from '../services/userService.js';
 
@@ -83,6 +84,15 @@ router.post('/:id/activate', async (req, res) => {
 router.post('/:id/deactivate', async (req, res) => {
   try {
     const user = await deactivateUser(req.params.id, req.admin);
+    res.json({ user });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.post('/:id/logout', async (req, res) => {
+  try {
+    const user = await logoutUserDevices(req.params.id, req.admin);
     res.json({ user });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

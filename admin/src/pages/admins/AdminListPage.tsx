@@ -22,11 +22,7 @@ export function AdminListPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Admins</h1>
-          <p className="text-muted-foreground">Create and manage portal admin accounts</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button asChild>
           <Link to="/admins/new">
             <Plus className="h-4 w-4" />

@@ -1,18 +1,21 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { createUser } from '@/api/users'
+import { createUser, fetchUsers } from '@/api/users'
 import { getErrorMessage } from '@/api/client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { MAX_USERS } from '@/types/user'
 import type { UserStatus } from '@/types/user'
 
 export function UserCreatePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => fetchUsers() })
+  const atLimit = users.length >= MAX_USERS
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
@@ -22,10 +25,10 @@ export function UserCreatePage() {
 
   const mutation = useMutation({
     mutationFn: createUser,
-    onSuccess: (user) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       toast.success('User created')
-      navigate(`/users/${user.id}`)
+      navigate('/users')
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -44,18 +47,21 @@ export function UserCreatePage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Add APK user</h1>
-        <p className="text-muted-foreground">Create a client account for the Android app</p>
-      </div>
       <Card>
         <CardHeader>
           <CardTitle>Account details</CardTitle>
           <CardDescription>
-            Users must be active before they can join a meeting. Password must be at least 8 characters.
+            Users must be active before they can join a meeting. Password must be at least 8 characters.{' '}
+            {users.length} / {MAX_USERS} accounts used.
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {atLimit && (
+            <p className="mb-4 rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+              User limit reached — a maximum of {MAX_USERS} users can be created. Delete or deactivate an
+              existing user to free up a slot.
+            </p>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="name">Full name</Label>
@@ -103,7 +109,7 @@ export function UserCreatePage() {
               </select>
             </div>
             <div className="flex gap-3 pt-2">
-              <Button type="submit" disabled={mutation.isPending}>
+              <Button type="submit" disabled={mutation.isPending || atLimit}>
                 {mutation.isPending ? 'Creating…' : 'Create user'}
               </Button>
               <Button variant="outline" asChild>

@@ -10,6 +10,7 @@ export type AuditAction =
   | 'user_deactivated'
   | 'user_deleted'
   | 'user_force_dropped'
+  | 'user_logged_out'
   | 'token_issued'
   | 'token_revoked'
   | 'recording_accessed'
@@ -22,7 +23,10 @@ export interface AuditLogEntry {
   actorRole: string
   action: AuditAction
   targetAdminId: string | null
+  targetAdminName: string | null
   targetUserId: string | null
+  targetUserName: string | null
+  targetUserPhone: string | null
   meta: Record<string, unknown>
   createdAt: string
 }

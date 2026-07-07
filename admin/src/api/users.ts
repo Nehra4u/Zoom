@@ -47,6 +47,11 @@ export async function deactivateUser(id: string) {
   return data.user
 }
 
+export async function logoutUser(id: string) {
+  const { data } = await api.post<{ user: ApkUser }>(`/users/${id}/logout`)
+  return data.user
+}
+
 export async function deleteUser(id: string) {
   const { data } = await api.delete<{ user: ApkUser }>(`/users/${id}`)
   return data.user

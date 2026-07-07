@@ -18,6 +18,7 @@ const auditLogSchema = new mongoose.Schema(
         'user_deactivated',
         'user_deleted',
         'user_force_dropped',
+        'user_logged_out',
         'token_issued',
         'token_revoked',
         'recording_accessed',

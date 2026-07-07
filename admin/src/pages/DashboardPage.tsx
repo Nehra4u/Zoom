@@ -1,155 +1,34 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
-import {
-  Mic,
-  MicOff,
-  PhoneOff,
-  Play,
-  Radio,
-  UserMinus,
-  UserX,
-  Wifi,
-  WifiOff,
-} from 'lucide-react'
+import { Video } from 'lucide-react'
 import { toast } from 'sonner'
-import {
-  endMeeting,
-  fetchCurrentSession,
-  muteParticipant,
-  removeParticipantFromCall,
-  simulateSessionEvent,
-  startMeeting,
-  unmuteParticipant,
-} from '@/api/session'
-import { fetchUsers, deactivateUser } from '@/api/users'
+import { endMeeting, fetchCurrentSession, startMeeting } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
 import { MeetingJoinPanel } from '@/components/MeetingJoinPanel'
 import { useSessionStore } from '@/stores/sessionStore'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import type { SessionParticipant } from '@/types/session'
 
-const isDev = import.meta.env.DEV
+function formatTime(date: Date) {
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
+}
 
-function ParticipantCard({
-  participant,
-  onRemove,
-  onBlock,
-  onMute,
-  onUnmute,
-  removing,
-  blocking,
-  muting,
-}: {
-  participant: SessionParticipant
-  onRemove: (userId: string) => void
-  onBlock: (userId: string) => void
-  onMute: (userId: string) => void
-  onUnmute: (userId: string) => void
-  removing: boolean
-  blocking: boolean
-  muting: boolean
-}) {
-  return (
-    <Card>
-      <CardContent className="flex items-center justify-between p-4">
-        <div className="flex items-center gap-4">
-          <div
-            className={`flex h-10 w-10 items-center justify-center rounded-full ${participant.isMuted ? 'bg-muted' : 'bg-destructive/15'}`}
-          >
-            {participant.isMuted ? (
-              <MicOff className="h-5 w-5 text-muted-foreground" />
-            ) : (
-              <Mic className="h-5 w-5 text-destructive" />
-            )}
-          </div>
-          <div>
-            <p className="font-medium">{participant.displayName}</p>
-            <p className="text-sm text-muted-foreground">{participant.zoomDisplayName}</p>
-            {participant.joinedAt && (
-              <p className="text-xs text-muted-foreground">
-                Joined {new Date(participant.joinedAt).toLocaleTimeString()}
-              </p>
-            )}
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Badge variant={participant.isMuted ? 'secondary' : 'success'}>
-            {participant.isMuted ? 'Muted' : 'Live'}
-          </Badge>
-          <Button variant="outline" size="sm" asChild>
-            <Link to={`/users/${participant.userId}`}>View</Link>
-          </Button>
-          {participant.isMuted ? (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={muting}
-              onClick={() => onUnmute(participant.userId)}
-            >
-              <Mic className="h-4 w-4" />
-              Unmute
-            </Button>
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={muting}
-              onClick={() => onMute(participant.userId)}
-            >
-              <MicOff className="h-4 w-4" />
-              Mute
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={removing}
-            onClick={() => onRemove(participant.userId)}
-          >
-            <UserMinus className="h-4 w-4" />
-            Remove
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={blocking}
-            onClick={() => onBlock(participant.userId)}
-          >
-            <UserX className="h-4 w-4" />
-            Block
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
+function formatDate(date: Date) {
+  return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
 export function DashboardPage() {
   const queryClient = useQueryClient()
-  const [endDialogOpen, setEndDialogOpen] = useState(false)
-  const { participants, meetingLive, meeting, socketConnected, setSnapshot } =
-    useSessionStore()
+  const [now, setNow] = useState(() => new Date())
+  const { meetingLive, socketConnected, setSnapshot } = useSessionStore()
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
 
   const sessionQuery = useQuery({
     queryKey: ['session', 'current'],
     queryFn: fetchCurrentSession,
     refetchInterval: socketConnected ? false : 30_000,
-  })
-
-  const usersQuery = useQuery({
-    queryKey: ['users'],
-    queryFn: () => fetchUsers(),
-    enabled: isDev,
   })
 
   useEffect(() => {
@@ -174,241 +53,56 @@ export function DashboardPage() {
   const endMutation = useMutation({
     mutationFn: endMeeting,
     onSuccess: () => {
-      setEndDialogOpen(false)
       invalidateSession()
       toast.success('Meeting ended — recording will appear in Recordings when ready')
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
-  const removeMutation = useMutation({
-    mutationFn: removeParticipantFromCall,
-    onSuccess: () => {
-      invalidateSession()
-      toast.success('Participant removed from call')
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  })
-
-  const muteMutation = useMutation({
-    mutationFn: muteParticipant,
-    onSuccess: () => {
-      invalidateSession()
-      toast.success('Participant muted')
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  })
-
-  const unmuteMutation = useMutation({
-    mutationFn: unmuteParticipant,
-    onSuccess: () => {
-      invalidateSession()
-      toast.success('Participant unmuted')
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  })
-
-  const blockMutation = useMutation({
-    mutationFn: deactivateUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] })
-      invalidateSession()
-      toast.success('User deactivated and removed from call')
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  })
-
-  const simulateMutation = useMutation({
-    mutationFn: simulateSessionEvent,
-    onSuccess: () => invalidateSession(),
-    onError: (err) => toast.error(getErrorMessage(err)),
-  })
-
-  const demoUser = usersQuery.data?.[0]
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Live Dashboard</h1>
-          <p className="text-muted-foreground">Start meetings, monitor participants, and manage access</p>
+    <div className="h-full">
+      {meetingLive ? (
+        <div className="-m-6 h-[calc(100%+3rem)] w-[calc(100%+3rem)]">
+          <MeetingJoinPanel
+            meetingLive={meetingLive}
+            onMeetingEnded={async () => {
+              await endMutation.mutateAsync()
+            }}
+          />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={socketConnected ? 'success' : 'destructive'} className="gap-1">
-            {socketConnected ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-            {socketConnected ? 'Connected' : 'Disconnected'}
-          </Badge>
-          <Badge variant={meetingLive ? 'success' : 'secondary'} className="gap-1">
-            <Radio className="h-3 w-3" />
-            {meetingLive ? 'Meeting live' : 'No meeting'}
-          </Badge>
-          {!meetingLive ? (
-            <Button
-              size="sm"
+      ) : (
+        <div className="flex h-full flex-col items-center justify-center gap-10">
+          <div className="text-center">
+            <p className="text-2xl font-semibold tracking-tight text-foreground">{formatTime(now)}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{formatDate(now)}</p>
+          </div>
+
+          <div className="flex flex-col items-center gap-4">
+            <button
+              type="button"
               disabled={startMutation.isPending}
               onClick={() => startMutation.mutate()}
+              className="group relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-gradient-to-br from-chart-1 to-blue-700 text-primary-foreground shadow-[0_12px_28px_-6px_rgba(37,99,235,0.55)] transition-all duration-300 hover:scale-105 hover:shadow-[0_16px_34px_-4px_rgba(37,99,235,0.65)] active:scale-95 active:shadow-[0_6px_16px_-4px_rgba(37,99,235,0.5)] disabled:opacity-60 disabled:animate-none animate-button-float"
+              aria-label="Start new meeting"
             >
-              <Play className="h-4 w-4" />
-              Start Meeting
-            </Button>
-          ) : (
-            <>
-              <Button
-                size="sm"
-                variant="destructive"
-                disabled={endMutation.isPending}
-                onClick={() => setEndDialogOpen(true)}
-              >
-                <PhoneOff className="h-4 w-4" />
-                End Meeting
-              </Button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {meeting && meetingLive && (
-        <Card>
-          <CardContent className="flex flex-wrap gap-6 pt-6 text-sm">
-            <p>
-              <span className="text-muted-foreground">Meeting ID:</span>{' '}
-              <span className="font-mono">{meeting.meetingNumber}</span>
+              {!startMutation.isPending && (
+                <>
+                  <span className="absolute inset-0 rounded-full bg-chart-1/40 animate-ring-pulse" />
+                  <span
+                    className="absolute inset-0 rounded-full bg-chart-1/40 animate-ring-pulse"
+                    style={{ animationDelay: '1.5s' }}
+                  />
+                </>
+              )}
+              <span className="absolute inset-0 rounded-full bg-gradient-to-b from-white/30 via-white/0 to-black/10" />
+              <Video className="relative h-7 w-7" />
+            </button>
+            <p className="text-lg font-semibold text-foreground">
+              {startMutation.isPending ? 'Starting meeting…' : 'Start New Meeting'}
             </p>
-            {meeting.startedAt && (
-              <p>
-                <span className="text-muted-foreground">Started:</span>{' '}
-                {new Date(meeting.startedAt).toLocaleString()}
-              </p>
-            )}
-            <p>
-              <span className="text-muted-foreground">Participants:</span> {participants.length}
-            </p>
-            <p>
-              <Link to="/recordings" className="text-primary underline-offset-4 hover:underline">
-                View recordings
-              </Link>
-            </p>
-          </CardContent>
-        </Card>
-      )}
-
-      <MeetingJoinPanel
-        meetingLive={meetingLive}
-        onMeetingEnded={async () => {
-          await endMutation.mutateAsync()
-        }}
-      />
-
-      {sessionQuery.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading session…</p>
-      ) : !meetingLive ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>No active meeting</CardTitle>
-            <CardDescription>
-              Click Start Meeting to create an instant Zoom session. Your active APK users will be notified to join.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : participants.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Waiting for participants</CardTitle>
-            <CardDescription>
-              Meeting is live. When your APK clients join, they will appear here in real time.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      ) : (
-        <div className="grid gap-4">
-          {participants.map((p) => (
-            <ParticipantCard
-              key={p.userId}
-              participant={p}
-              onRemove={(id) => removeMutation.mutate(id)}
-              onBlock={(id) => blockMutation.mutate(id)}
-              onMute={(id) => muteMutation.mutate(id)}
-              onUnmute={(id) => unmuteMutation.mutate(id)}
-              removing={removeMutation.isPending}
-              blocking={blockMutation.isPending}
-              muting={muteMutation.isPending || unmuteMutation.isPending}
-            />
-          ))}
-        </div>
-      )}
-
-      {isDev && demoUser && meetingLive && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Dev simulator</CardTitle>
-            <CardDescription>
-              Simulate events for {demoUser.name} ({demoUser.email})
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-wrap gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={simulateMutation.isPending}
-              onClick={() =>
-                simulateMutation.mutate({
-                  event: 'joined',
-                  userId: demoUser.id,
-                  displayName: demoUser.name,
-                  zoomParticipantId: `sim-${demoUser.id}`,
-                  meetingId: meeting?.meetingNumber,
-                })
-              }
-            >
-              Simulate join
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={simulateMutation.isPending}
-              onClick={() => simulateMutation.mutate({ event: 'left', userId: demoUser.id })}
-            >
-              Simulate leave
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={simulateMutation.isPending}
-              onClick={() => simulateMutation.mutate({ event: 'muted', userId: demoUser.id })}
-            >
-              Simulate mute
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={simulateMutation.isPending}
-              onClick={() => simulateMutation.mutate({ event: 'unmuted', userId: demoUser.id })}
-            >
-              Simulate unmute
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      <Dialog open={endDialogOpen} onOpenChange={setEndDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>End meeting?</DialogTitle>
-            <DialogDescription>
-              This will end the Zoom meeting for all participants. Cloud recording will be processed after the
-              meeting ends and will appear in the Recordings section.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button variant="outline" onClick={() => setEndDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="destructive" disabled={endMutation.isPending} onClick={() => endMutation.mutate()}>
-              End Meeting
-            </Button>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
     </div>
   )
 }

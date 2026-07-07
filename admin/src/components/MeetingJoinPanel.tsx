@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { endMeeting, fetchAdminJoinToken, type AdminJoinCredentials } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
+import { cn } from '@/lib/utils'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface MeetingJoinPanelProps {
@@ -153,25 +154,27 @@ export function MeetingJoinPanel({ meetingLive, onMeetingEnded }: MeetingJoinPan
   if (!meetingLive) return null
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>In-portal meeting</CardTitle>
-        <CardDescription>
-          You join automatically when the meeting starts. Manage participants below while in the call
-          — you appear as <strong>your admin name</strong>.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <Card className={cn('flex h-full flex-col', showFrame && 'gap-0 rounded-none border-0 py-0')}>
+      {!showFrame && (
+        <CardHeader>
+          <CardTitle>In-portal meeting</CardTitle>
+          <CardDescription>
+            You join automatically when the meeting starts. Manage participants below while in the call
+            — you appear as <strong>your admin name</strong>.
+          </CardDescription>
+        </CardHeader>
+      )}
+      <CardContent className={cn('flex flex-1 flex-col space-y-4', showFrame && 'p-0')}>
         {joining && !showFrame && (
           <p className="text-sm text-muted-foreground">Joining meeting in portal…</p>
         )}
 
         {showFrame && (
-          <div className="w-full overflow-hidden rounded-lg border bg-black">
+          <div className="h-full w-full flex-1 bg-black">
             <iframe
               ref={iframeRef}
               title="Zoom meeting"
-              className="h-[520px] w-full border-0"
+              className="h-full w-full border-0"
               allow="camera; microphone; fullscreen; display-capture; autoplay"
             />
           </div>

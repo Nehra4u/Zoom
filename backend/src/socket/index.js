@@ -1,9 +1,22 @@
 import { Server } from 'socket.io';
 import { User } from '../models/User.js';
 import { DeviceSession } from '../models/DeviceSession.js';
-import { setIo } from '../services/io.js';
+import { setIo, getIo } from '../services/io.js';
 import { sendStatusSync } from '../services/notificationService.js';
 import { authenticateAdminSocket, authenticateClientSocket } from './middleware.js';
+
+// "Online" here means a live, currently-connected /client websocket for that user —
+// distinct from the user's account status ("Activated"), which is a separate concept.
+export function getOnlineUserIds() {
+  const io = getIo();
+  const ids = new Set();
+  if (!io) return ids;
+
+  for (const socket of io.of('/client').sockets.values()) {
+    if (socket.data?.userId) ids.add(String(socket.data.userId));
+  }
+  return ids;
+}
 
 export function setupSocket(httpServer) {
   const io = new Server(httpServer, {

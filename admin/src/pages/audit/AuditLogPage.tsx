@@ -1,5 +1,5 @@
 import { useQuery, useMutation } from '@tanstack/react-query'
-import { ClipboardList, RefreshCw } from 'lucide-react'
+import { ClipboardList } from 'lucide-react'
 import { toast } from 'sonner'
 import { fetchAuditLogs, triggerReconciliation } from '@/api/audit'
 import { getErrorMessage } from '@/api/client'
@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import type { AuditLogEntry } from '@/types/audit'
 
 const ACTION_LABELS: Record<string, string> = {
   admin_created: 'Admin created',
@@ -21,6 +22,7 @@ const ACTION_LABELS: Record<string, string> = {
   user_deactivated: 'User deactivated',
   user_deleted: 'User deleted',
   user_force_dropped: 'Force dropped',
+  user_logged_out: 'User logged out',
   token_issued: 'Token issued',
   token_revoked: 'Token revoked',
   recording_accessed: 'Recording accessed',
@@ -31,6 +33,28 @@ const ACTION_LABELS: Record<string, string> = {
 
 function actionLabel(action: string) {
   return ACTION_LABELS[action] ?? action.replace(/_/g, ' ');
+}
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+function formatTimestamp(iso: string) {
+  const date = new Date(iso)
+  const day = String(date.getDate()).padStart(2, '0')
+  const time = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true })
+  return `${day} ${MONTHS[date.getMonth()]} ${date.getFullYear()}, ${time}`
+}
+
+function targetLabel(log: AuditLogEntry) {
+  if (log.targetUserId) {
+    return `${log.targetUserName ?? 'Unknown'} (${log.targetUserPhone ?? 'no phone'})`
+  }
+  if (log.targetAdminId) {
+    return log.targetAdminName ?? 'Unknown admin'
+  }
+  return '—'
 }
 
 export function AuditLogPage() {
@@ -54,34 +78,20 @@ export function AuditLogPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Audit Log</h1>
-          <p className="text-muted-foreground">
-            {isSuperAdmin
-              ? 'All platform actions across admins and users'
-              : 'Your actions only'}
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4" />
-            Refresh
+      {isSuperAdmin && (
+        <div className="flex items-start justify-end">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={reconcileMutation.isPending}
+            onClick={() => reconcileMutation.mutate()}
+          >
+            Run reconciliation
           </Button>
-          {isSuperAdmin && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={reconcileMutation.isPending}
-              onClick={() => reconcileMutation.mutate()}
-            >
-              Run reconciliation
-            </Button>
-          )}
         </div>
-      </div>
+      )}
 
-      <Card>
+      <Card className="gap-3">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ClipboardList className="h-5 w-5" />
@@ -102,7 +112,7 @@ export function AuditLogPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Time</TableHead>
-                  <TableHead>Actor</TableHead>
+                  <TableHead>User</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead>Target</TableHead>
                 </TableRow>
@@ -110,25 +120,19 @@ export function AuditLogPage() {
               <TableBody>
                 {logs.map((log) => (
                   <TableRow key={log.id}>
-                    <TableCell className="whitespace-nowrap text-muted-foreground">
-                      {new Date(log.createdAt).toLocaleString()}
+                    <TableCell className="whitespace-nowrap py-1.5 text-xs text-muted-foreground">
+                      {formatTimestamp(log.createdAt)}
                     </TableCell>
-                    <TableCell>
-                      <div>
-                        <p className="text-sm font-medium">{log.actorName ?? 'Unknown'}</p>
-                        <p className="text-xs text-muted-foreground">{log.actorEmail}</p>
-                      </div>
-                      <Badge variant="outline" className="mt-1 text-xs">
-                        {log.actorRole.replace('_', ' ')}
+                    <TableCell className="whitespace-nowrap py-1.5 text-xs">
+                      {log.actorName ?? 'Unknown'}
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap py-1.5">
+                      <Badge variant="secondary" className="text-[11px]">
+                        {actionLabel(log.action)}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">{actionLabel(log.action)}</Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {log.targetUserId && <span>User: {log.targetUserId.slice(-6)}</span>}
-                      {log.targetAdminId && <span>Admin: {log.targetAdminId.slice(-6)}</span>}
-                      {!log.targetUserId && !log.targetAdminId && '—'}
+                    <TableCell className="whitespace-nowrap py-1.5 text-xs text-muted-foreground">
+                      {targetLabel(log)}
                     </TableCell>
                   </TableRow>
                 ))}

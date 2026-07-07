@@ -32,6 +32,13 @@ function statusVariant(status: UserStatus) {
   return 'destructive' as const
 }
 
+function statusLabel(status: UserStatus) {
+  if (status === 'active') return 'Activated'
+  if (status === 'inactive') return 'Deactivated'
+  if (status === 'pending') return 'Pending'
+  return 'Deleted'
+}
+
 export function UserDetailPage() {
   const { id = '' } = useParams()
   const navigate = useNavigate()
@@ -115,7 +122,7 @@ export function UserDetailPage() {
         </Link>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{user.name}</h1>
         <div className="mt-2 flex gap-2">
-          <Badge variant={statusVariant(user.status)}>{user.status}</Badge>
+          <Badge variant={statusVariant(user.status)}>{statusLabel(user.status)}</Badge>
           {user.lastActiveAt && (
             <Badge variant="outline">Last active: {new Date(user.lastActiveAt).toLocaleString()}</Badge>
           )}

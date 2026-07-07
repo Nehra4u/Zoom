@@ -13,6 +13,7 @@ import { AdminDetailPage } from '@/pages/admins/AdminDetailPage'
 import { RecordingListPage } from '@/pages/recordings/RecordingListPage'
 import { AuditLogPage } from '@/pages/audit/AuditLogPage'
 import { SystemPage } from '@/pages/system/SystemPage'
+import { AppDetailsPage } from '@/pages/system/AppDetailsPage'
 import { useAuth } from '@/auth/AuthContext'
 
 function HomeRedirect() {
@@ -35,6 +36,7 @@ export function AppRoutes() {
             <Route path="recordings" element={<RecordingListPage />} />
             <Route path="audit-logs" element={<AuditLogPage />} />
             <Route path="system" element={<SystemPage />} />
+            <Route path="app-info" element={<AppDetailsPage />} />
             <Route element={<RequireSuperAdmin />}>
               <Route path="admins" element={<AdminListPage />} />
               <Route path="admins/new" element={<AdminCreatePage />} />

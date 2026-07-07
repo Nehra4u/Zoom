@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" fill="none">
+  <path fill="#4280EF" d="M54,10L54,10A44,44 0,0 1,98 54L98,54A44,44 0,0 1,54 98L54,98A44,44 0,0 1,10 54L10,54A44,44 0,0 1,54 10" />
+  <path
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="5"
+    d="M36,42L59,42A5,5 0,0 1,64 47L64,61A5,5 0,0 1,59 66L36,66A5,5 0,0 1,31 61L31,47A5,5 0,0 1,36 42" />
+  <path
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    stroke-width="5"
+    d="M64,50L78,42L78,66L64,58" />
+</svg>
