@@ -1,8 +1,10 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { Film, Play } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ExternalLink, Film, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteRecording, fetchRecordings, fetchRecordingPlayUrl, syncRecordingsFromZoom } from '@/api/recordings'
 import { getErrorMessage } from '@/api/client'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -83,29 +85,69 @@ function RecordingRow({
   })
 
   return (
-    <TableRow>
-      <TableCell className="font-medium">{recording.topic}</TableCell>
-      <TableCell>{new Date(recording.startTime).toLocaleString()}</TableCell>
-      <TableCell>{formatDuration(recording.duration)}</TableCell>
-      <TableCell className="text-muted-foreground">{formatFileSize(recording.fileSize)}</TableCell>
-      <TableCell className="text-right">
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={playMutation.isPending}
-          onClick={() => playMutation.mutate()}
-        >
-          {playMutation.isPending ? (
-            'Loading…'
-          ) : (
-            <>
-              <Play className="h-4 w-4" />
-              Play
-            </>
-          )}
-        </Button>
-      </TableCell>
-    </TableRow>
+    <>
+      <TableRow>
+        <TableCell className="font-medium">{recording.topic}</TableCell>
+        <TableCell>{new Date(recording.startTime).toLocaleString()}</TableCell>
+        <TableCell>{formatDuration(recording.duration)}</TableCell>
+        <TableCell>
+          <Badge variant="secondary">{recording.fileType}</Badge>
+        </TableCell>
+        <TableCell className="text-muted-foreground">{formatFileSize(recording.fileSize)}</TableCell>
+        <TableCell className="text-right">
+          <div className="flex justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={playMutation.isPending || deleteMutation.isPending}
+              onClick={() => playMutation.mutate()}
+            >
+              {playMutation.isPending ? (
+                'Loading…'
+              ) : (
+                <>
+                  <Play className="h-4 w-4" />
+                  Play
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={playMutation.isPending || deleteMutation.isPending}
+              onClick={() => setDeleteOpen(true)}
+            >
+              <Trash2 className="h-4 w-4" />
+              Remove
+            </Button>
+          </div>
+        </TableCell>
+      </TableRow>
+
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove recording from portal?</DialogTitle>
+            <DialogDescription>
+              This removes <strong>{recording.topic}</strong> from the admin portal only. The file stays in Zoom
+              cloud and may reappear if you sync again.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              Remove
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
@@ -161,22 +203,33 @@ export function RecordingListPage() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Film className="h-5 w-5" />
-            Cloud Recordings
-          </CardTitle>
-          {isLoading ? (
-            <Skeleton className="h-4 w-64" />
-          ) : (
-            <CardDescription>
-              {recordings.length} recording{recordings.length !== 1 ? 's' : ''}. URLs expire — click Play to fetch a
-              new one.
-              {isSyncing && recordings.length === 0 ? (
-                <span className="ml-2 text-foreground/80">Syncing from Zoom…</span>
-              ) : null}
-            </CardDescription>
-          )}
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 space-y-0">
+          <div className="space-y-1.5">
+            <CardTitle className="flex items-center gap-2">
+              <Film className="h-5 w-5" />
+              Cloud Recordings
+            </CardTitle>
+            {isLoading ? (
+              <Skeleton className="h-4 w-64" />
+            ) : (
+              <CardDescription>
+                {recordings.length} recording{recordings.length !== 1 ? 's' : ''}. URLs expire — click Play to fetch a
+                new one.
+                {isSyncing && recordings.length === 0 ? (
+                  <span className="ml-2 text-foreground/80">Syncing from Zoom…</span>
+                ) : null}
+              </CardDescription>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isSyncing}
+            onClick={() => syncMutation.mutate({ manual: true })}
+          >
+            <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing…' : 'Sync from Zoom'}
+          </Button>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -202,6 +255,7 @@ export function RecordingListPage() {
                   <TableHead>Topic</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Duration</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Size</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
@@ -215,6 +269,21 @@ export function RecordingListPage() {
           )}
         </CardContent>
       </Card>
+
+      {import.meta.env.DEV && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">About playback</CardTitle>
+          </CardHeader>
+          <CardContent className="flex items-start gap-2 text-sm text-muted-foreground">
+            <ExternalLink className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              Play URLs are time-limited and fetched from the Zoom API at click time — never stored in our database.
+              Sync pulls metadata from Zoom cloud; webhooks keep the list updated automatically.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

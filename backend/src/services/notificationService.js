@@ -1,6 +1,10 @@
 import { getIo } from './io.js';
 import { buildClientMeetingPayload, buildClientStatusPayload } from './clientMeetingPayload.js';
 
+function adminRoom(adminId) {
+  return `admin:${adminId}`;
+}
+
 function clientRoom(userId) {
   return `client:${userId}`;
 }
@@ -109,6 +113,18 @@ export function notifyAdminSessionStarted(meeting) {
   }
 
   io.of('/admin').to('admin:session').emit('session:started', { meeting });
+}
+
+export function notifyAdminSessionRevoked(adminId) {
+  const io = getIo();
+  if (!io) {
+    console.log(`[notification] admin:session:revoked → ${adminRoom(adminId)}`);
+    return;
+  }
+
+  io.of('/admin').to(adminRoom(adminId)).emit('admin:session:revoked', {
+    message: 'Logged in from another device.',
+  });
 }
 
 export function notifySessionEnded(userIds, meetingId = null) {

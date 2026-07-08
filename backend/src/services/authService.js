@@ -10,6 +10,7 @@ import {
   decodeTokenUnsafe,
 } from '../services/tokenService.js';
 import { toPublicAdmin } from '../services/adminService.js';
+import { notifyAdminSessionRevoked } from './notificationService.js';
 
 const MAX_FAILED = 5;
 const LOCKOUT_MINUTES = 5;
@@ -50,6 +51,12 @@ export async function loginAdmin(email, password) {
 
   admin.lastLoginAt = new Date();
   await admin.save();
+
+  await AdminRefreshToken.updateMany(
+    { adminId: admin._id, revokedAt: null },
+    { revokedAt: new Date() }
+  );
+  notifyAdminSessionRevoked(admin._id.toString());
 
   const accessToken = signAdminAccessToken(admin);
   const refresh = signAdminRefreshToken(admin._id);

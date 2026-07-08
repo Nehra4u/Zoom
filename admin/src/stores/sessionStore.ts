@@ -6,14 +6,23 @@ interface SessionStore {
   sessionActive: boolean
   meetingLive: boolean
   meeting: ActiveMeeting | null
+  meetingOwnedByMe: boolean
+  canEndMeeting: boolean
+  portalJoined: boolean
+  portalJoinAttempted: boolean
   socketConnected: boolean
   setSnapshot: (snapshot: {
     participants: SessionParticipant[]
     sessionActive: boolean
     meetingLive?: boolean
     meeting?: ActiveMeeting | null
+    meetingOwnedByMe?: boolean
+    canEndMeeting?: boolean
   }) => void
   setMeetingStarted: (meeting: ActiveMeeting) => void
+  applyLiveMeeting: (meeting: ActiveMeeting, opts?: { canEndMeeting?: boolean; meetingOwnedByMe?: boolean }) => void
+  setPortalJoined: (joined: boolean) => void
+  setPortalJoinAttempted: (attempted: boolean) => void
   setSocketConnected: (connected: boolean) => void
   upsertParticipant: (participant: SessionParticipant) => void
   removeParticipant: (userId: string) => void
@@ -27,14 +36,24 @@ export const useSessionStore = create<SessionStore>((set) => ({
   sessionActive: false,
   meetingLive: false,
   meeting: null,
+  meetingOwnedByMe: false,
+  canEndMeeting: false,
+  portalJoined: false,
+  portalJoinAttempted: false,
   socketConnected: false,
 
-  setSnapshot: ({ participants, sessionActive, meetingLive, meeting }) =>
-    set({
-      participants,
-      sessionActive,
-      meetingLive: meetingLive ?? false,
-      meeting: meeting ?? null,
+  setSnapshot: ({ participants, sessionActive, meetingLive, meeting, meetingOwnedByMe, canEndMeeting }) =>
+    set(() => {
+      const live = meetingLive ?? false
+      return {
+        participants,
+        sessionActive,
+        meetingLive: live,
+        meeting: meeting ?? null,
+        meetingOwnedByMe: meetingOwnedByMe ?? false,
+        canEndMeeting: canEndMeeting ?? false,
+        ...(live === false ? { portalJoined: false, portalJoinAttempted: false } : {}),
+      }
     }),
 
   setMeetingStarted: (meeting) =>
@@ -42,7 +61,22 @@ export const useSessionStore = create<SessionStore>((set) => ({
       meetingLive: true,
       meeting,
       sessionActive: true,
+      meetingOwnedByMe: true,
+      canEndMeeting: true,
     }),
+
+  applyLiveMeeting: (meeting, opts) =>
+    set({
+      meetingLive: true,
+      meeting,
+      sessionActive: true,
+      meetingOwnedByMe: opts?.meetingOwnedByMe ?? false,
+      canEndMeeting: opts?.canEndMeeting ?? true,
+    }),
+
+  setPortalJoined: (portalJoined) => set({ portalJoined }),
+
+  setPortalJoinAttempted: (portalJoinAttempted) => set({ portalJoinAttempted }),
 
   setSocketConnected: (socketConnected) => set({ socketConnected }),
 
@@ -75,6 +109,10 @@ export const useSessionStore = create<SessionStore>((set) => ({
       sessionActive: false,
       meetingLive: false,
       meeting: null,
+      meetingOwnedByMe: false,
+      canEndMeeting: false,
+      portalJoined: false,
+      portalJoinAttempted: false,
     }),
 
   reset: () =>
@@ -83,6 +121,10 @@ export const useSessionStore = create<SessionStore>((set) => ({
       sessionActive: false,
       meetingLive: false,
       meeting: null,
+      meetingOwnedByMe: false,
+      canEndMeeting: false,
+      portalJoined: false,
+      portalJoinAttempted: false,
       socketConnected: false,
     }),
 }))

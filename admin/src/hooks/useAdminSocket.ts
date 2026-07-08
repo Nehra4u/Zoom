@@ -2,9 +2,16 @@ import { useEffect, useRef } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { getStoredAccessToken } from '@/api/client'
+import { clearStoredTokens, getStoredAccessToken } from '@/api/client'
 import { useSessionStore } from '@/stores/sessionStore'
 import type { ActiveMeeting, SessionParticipant } from '@/types/session'
+
+function handleSessionRevoked() {
+  clearStoredTokens()
+  useSessionStore.getState().reset()
+  toast.error('Logged in from another device')
+  window.location.href = '/login'
+}
 
 export function useAdminSocket(enabled = true) {
   const socketRef = useRef<Socket | null>(null)
@@ -38,6 +45,11 @@ export function useAdminSocket(enabled = true) {
     })
     socket.on('disconnect', () => setSocketConnected(false))
     socket.on('connect_error', () => setSocketConnected(false))
+
+    socket.on('admin:session:revoked', () => {
+      socket.disconnect()
+      handleSessionRevoked()
+    })
 
     socket.on('session:started', (payload: { meeting: ActiveMeeting }) => {
       if (payload?.meeting) {

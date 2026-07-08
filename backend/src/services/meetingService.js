@@ -7,6 +7,7 @@ import { writeAuditLog } from './auditService.js';
 import {
   assertAdminOwnsUser,
   assertCanManageMeeting,
+  canManageMeeting,
   userScopeQuery,
 } from './adminScope.js';
 import {
@@ -55,6 +56,35 @@ function zoomIdMatch(normalized) {
 export async function getLiveMeetingForAdmin(adminId) {
   if (!adminId) return null;
   return ActiveMeeting.findOne({ status: 'live', startedBy: adminId }).sort({ startedAt: -1 });
+}
+
+/** Live meeting this admin owns or can access via shared Zoom host account. */
+export async function getAccessibleLiveMeeting(actor) {
+  if (!actor?.sub) return null;
+
+  const own = await getLiveMeetingForAdmin(actor.sub);
+  if (own) {
+    return { meeting: own, ownedByMe: true, canEnd: true };
+  }
+
+  const hostUserId = await resolveHostUserId(actor.sub);
+  if (!hostUserId) return null;
+
+  const onHost = await ActiveMeeting.findOne({ status: 'live', hostUserId }).sort({ startedAt: -1 });
+  if (!onHost) return null;
+
+  const ownedByMe = onHost.startedBy?.toString() === actor.sub;
+  const canEnd = canManageMeeting(actor, onHost) || onHost.hostUserId === hostUserId;
+  return { meeting: onHost, ownedByMe, canEnd };
+}
+
+async function assertCanAccessMeeting(actor, meeting) {
+  if (canManageMeeting(actor, meeting)) return meeting;
+  const hostUserId = await resolveHostUserId(actor.sub);
+  if (hostUserId && meeting.hostUserId === hostUserId) return meeting;
+  const err = new Error('You cannot access this meeting');
+  err.status = 403;
+  throw err;
 }
 
 export async function findLiveMeetingByZoomId(meetingId) {
@@ -117,6 +147,8 @@ export async function startMeeting(actor) {
   if (existing) {
     const err = new Error('You already have a live meeting');
     err.status = 409;
+    err.code = 'MEETING_ALREADY_LIVE';
+    err.meeting = toPublicMeeting(existing);
     throw err;
   }
 
@@ -129,6 +161,8 @@ export async function startMeeting(actor) {
       'This Zoom host account already has a live meeting. Assign a dedicated Zoom user to each admin for parallel meetings.'
     );
     err.status = 409;
+    err.code = 'ZOOM_HOST_BUSY';
+    err.meeting = toPublicMeeting(existingOnHost);
     throw err;
   }
 
@@ -187,14 +221,13 @@ export async function startMeeting(actor) {
 }
 
 export async function endMeeting(actor) {
-  const live = await getLiveMeetingForAdmin(actor.sub);
-  if (!live) {
+  const accessible = await getAccessibleLiveMeeting(actor);
+  if (!accessible?.canEnd) {
     const err = new Error('No live meeting to end');
     err.status = 404;
     throw err;
   }
-
-  await assertCanManageMeeting(actor, live);
+  const live = accessible.meeting;
 
   if (!isMockMode()) {
     try {
@@ -226,14 +259,14 @@ export async function endMeeting(actor) {
 }
 
 export async function getMeetingJoinInfo(actor) {
-  const live = await getLiveMeetingForAdmin(actor.sub);
-  if (!live) {
+  const accessible = await getAccessibleLiveMeeting(actor);
+  if (!accessible) {
     const err = new Error('No live meeting');
     err.status = 404;
     throw err;
   }
-
-  await assertCanManageMeeting(actor, live);
+  const live = accessible.meeting;
+  await assertCanAccessMeeting(actor, live);
 
   return {
     meetingNumber: live.meetingNumber,
@@ -245,16 +278,16 @@ export async function getMeetingJoinInfo(actor) {
 }
 
 export async function issueAdminJoinToken(actor) {
-  const live = await getLiveMeetingForAdmin(actor.sub);
-  if (!live) {
+  const accessible = await getAccessibleLiveMeeting(actor);
+  if (!accessible) {
     const err = new Error('No live meeting');
     err.status = 404;
     throw err;
   }
+  const live = accessible.meeting;
+  await assertCanAccessMeeting(actor, live);
 
-  await assertCanManageMeeting(actor, live);
-
-  const displayName = live.hostDisplayName ?? (await getAdminDisplayName(actor.sub));
+  const displayName = await getAdminDisplayName(actor.sub);
   const admin = await Admin.findById(actor.sub);
 
   // Role 1 + ZAK starts the meeting as host; userName keeps the admin's display name in Zoom.
@@ -282,14 +315,15 @@ export async function issueAdminJoinToken(actor) {
 export async function removeParticipantFromCall(userId, actor) {
   await assertAdminOwnsUser(actor, userId);
 
-  const live = await getLiveMeetingForAdmin(actor.sub);
+  const accessible = await getAccessibleLiveMeeting(actor);
+  const live = accessible?.meeting ?? null;
   if (!live) {
     const err = new Error('No live meeting');
     err.status = 404;
     throw err;
   }
 
-  await assertCanManageMeeting(actor, live);
+  await assertCanAccessMeeting(actor, live);
 
   const session = await SessionState.findOne({ userId, inCall: true, meetingId: live.meetingNumber });
   if (!session) {
@@ -319,14 +353,15 @@ export async function removeParticipantFromCall(userId, actor) {
 export async function setParticipantMuted(userId, muted, actor) {
   await assertAdminOwnsUser(actor, userId);
 
-  const live = await getLiveMeetingForAdmin(actor.sub);
+  const accessible = await getAccessibleLiveMeeting(actor);
+  const live = accessible?.meeting ?? null;
   if (!live) {
     const err = new Error('No live meeting');
     err.status = 404;
     throw err;
   }
 
-  await assertCanManageMeeting(actor, live);
+  await assertCanAccessMeeting(actor, live);
 
   const session = await SessionState.findOne({ userId, inCall: true, meetingId: live.meetingNumber });
   if (!session) {

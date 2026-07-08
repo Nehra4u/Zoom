@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +14,7 @@ export function LoginPage() {
   const { login, isAuthenticated, isSuperAdmin } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -26,6 +28,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       const loggedIn = await login(email, password)
+      await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
       toast.success('Welcome back')
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname
       const defaultPath = loggedIn.role === 'super_admin' ? '/admins' : '/dashboard'
