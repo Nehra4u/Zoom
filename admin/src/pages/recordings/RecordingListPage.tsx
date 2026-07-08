@@ -1,11 +1,5 @@
-<<<<<<< HEAD
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Film, Play } from 'lucide-react'
-=======
-import { useEffect, useRef, useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, Film, Play, RefreshCw, Trash2 } from 'lucide-react'
->>>>>>> 442b6025946742ec093718b234a05ff215321ca3
 import { toast } from 'sonner'
 import { deleteRecording, fetchRecordings, fetchRecordingPlayUrl, syncRecordingsFromZoom } from '@/api/recordings'
 import { getErrorMessage } from '@/api/client'
@@ -89,7 +83,6 @@ function RecordingRow({
   })
 
   return (
-<<<<<<< HEAD
     <TableRow>
       <TableCell className="font-medium">{recording.topic}</TableCell>
       <TableCell>{new Date(recording.startTime).toLocaleString()}</TableCell>
@@ -113,71 +106,6 @@ function RecordingRow({
         </Button>
       </TableCell>
     </TableRow>
-=======
-    <>
-      <TableRow>
-        <TableCell className="font-medium">{recording.topic}</TableCell>
-        <TableCell>{new Date(recording.startTime).toLocaleString()}</TableCell>
-        <TableCell>{formatDuration(recording.duration)}</TableCell>
-        <TableCell>
-          <Badge variant="secondary">{recording.fileType}</Badge>
-        </TableCell>
-        <TableCell className="text-muted-foreground">{formatFileSize(recording.fileSize)}</TableCell>
-        <TableCell className="text-right">
-          <div className="flex justify-end gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={playMutation.isPending || deleteMutation.isPending}
-              onClick={() => playMutation.mutate()}
-            >
-              {playMutation.isPending ? (
-                'Loading…'
-              ) : (
-                <>
-                  <Play className="h-4 w-4" />
-                  Play
-                </>
-              )}
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={playMutation.isPending || deleteMutation.isPending}
-              onClick={() => setDeleteOpen(true)}
-            >
-              <Trash2 className="h-4 w-4" />
-              Remove
-            </Button>
-          </div>
-        </TableCell>
-      </TableRow>
-
-      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Remove recording from portal?</DialogTitle>
-            <DialogDescription>
-              This removes <strong>{recording.topic}</strong> from the admin portal only. The file stays in Zoom
-              cloud and may reappear if you sync again.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={() => deleteMutation.mutate()}
-            >
-              Remove
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
->>>>>>> 442b6025946742ec093718b234a05ff215321ca3
   )
 }
 
@@ -232,34 +160,6 @@ export function RecordingListPage() {
 
   return (
     <div className="space-y-6">
-<<<<<<< HEAD
-=======
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        {isLoading ? (
-          <div className="space-y-2">
-            <Skeleton className="h-9 w-48" />
-            <Skeleton className="h-4 w-96 max-w-full" />
-          </div>
-        ) : (
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">Recordings</h1>
-            <p className="text-muted-foreground">
-              Cloud recordings from Zoom — synced from your Zoom account and updated via webhook
-            </p>
-          </div>
-        )}
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={isSyncing}
-          onClick={() => syncMutation.mutate({ manual: true })}
-        >
-          <RefreshCw className={`h-4 w-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          {isSyncing ? 'Syncing…' : 'Sync from Zoom'}
-        </Button>
-      </div>
-
->>>>>>> 442b6025946742ec093718b234a05ff215321ca3
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -315,24 +215,6 @@ export function RecordingListPage() {
           )}
         </CardContent>
       </Card>
-
-<<<<<<< HEAD
-=======
-      {import.meta.env.DEV && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">About playback</CardTitle>
-          </CardHeader>
-          <CardContent className="flex items-start gap-2 text-sm text-muted-foreground">
-            <ExternalLink className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              Play URLs are time-limited and fetched from the Zoom API at click time — never stored in our database.
-              Sync pulls metadata from Zoom cloud; webhooks keep the list updated automatically.
-            </p>
-          </CardContent>
-        </Card>
-      )}
->>>>>>> 442b6025946742ec093718b234a05ff215321ca3
     </div>
   )
 }
