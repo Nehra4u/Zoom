@@ -22,7 +22,11 @@ import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/auth/AuthContext'
 import { useAdminSocket } from '@/hooks/useAdminSocket'
+import { useSessionSync } from '@/hooks/useSessionSync'
+import { MeetingActiveBanner } from '@/components/MeetingActiveBanner'
+import { MeetingPortalHost } from '@/components/MeetingPortalHost'
 import { RightPanel } from '@/layouts/RightPanel'
+import { useSessionStore } from '@/stores/sessionStore'
 
 interface NavItem {
   to: string
@@ -98,8 +102,9 @@ function initials(name?: string) {
     .join('')
 }
 
-function NavButton({ item }: { item: NavItem }) {
+function NavButton({ item, meetingLive }: { item: NavItem; meetingLive?: boolean }) {
   const Icon = item.icon
+  const isDashboard = item.to === '/dashboard'
   return (
     <NavLink
       to={item.to}
@@ -115,6 +120,9 @@ function NavButton({ item }: { item: NavItem }) {
     >
       <Icon className="h-[18px] w-[18px] shrink-0" />
       <span className="flex-1 text-left">{item.label}</span>
+      {isDashboard && meetingLive && (
+        <span className="h-2 w-2 shrink-0 rounded-full bg-success animate-pulse" title="Meeting live" />
+      )}
     </NavLink>
   )
 }
@@ -124,7 +132,12 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { meetingLive } = useSessionStore()
   useAdminSocket(true)
+  useSessionSync()
+
+  const isDashboard = location.pathname.startsWith('/dashboard')
+  const showPortalBackground = meetingLive && !isDashboard
 
   const navItems = OPERATIONS_ITEMS.filter((item) => !item.superAdminOnly || isSuperAdmin)
   const heading = useMemo(
@@ -181,7 +194,7 @@ export function AppShell() {
           </p>
           <nav className="space-y-0.5">
             {navItems.map((item) => (
-              <NavButton key={item.to} item={item} />
+              <NavButton key={item.to} item={item} meetingLive={meetingLive} />
             ))}
           </nav>
         </div>
@@ -265,6 +278,16 @@ export function AppShell() {
           </div>
 
           <div className="flex items-center gap-2">
+            {meetingLive && !isDashboard && (
+              <button
+                type="button"
+                onClick={() => navigate('/dashboard')}
+                className="flex items-center gap-2 rounded-xl bg-success/10 px-3 py-1.5 text-xs font-medium text-success transition-colors hover:bg-success/20"
+              >
+                <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+                Meeting live
+              </button>
+            )}
             <button
               type="button"
               onClick={() => queryClient.invalidateQueries()}
@@ -294,8 +317,19 @@ export function AppShell() {
             </button>
           </div>
         </header>
-        <div className="flex-1 overflow-y-auto p-6">
-          <Outlet />
+        <div className="relative flex-1 overflow-hidden">
+          {meetingLive && (
+            <MeetingPortalHost mode={isDashboard ? 'visible' : 'background'} />
+          )}
+          <div
+            className={cn(
+              'h-full overflow-y-auto p-6',
+              meetingLive && isDashboard && 'invisible'
+            )}
+          >
+            <Outlet />
+          </div>
+          {showPortalBackground && <MeetingActiveBanner />}
         </div>
       </main>
 

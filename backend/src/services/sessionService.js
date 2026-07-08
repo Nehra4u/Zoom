@@ -3,7 +3,7 @@ import { User } from '../models/User.js';
 import { getIo } from './io.js';
 import { getClientUserIdsForAdmin } from './clientMeetingPayload.js';
 import { notifySessionEnded } from './notificationService.js';
-import { getLiveMeetingForAdmin, toPublicMeeting } from './meetingService.js';
+import { getAccessibleLiveMeeting, toPublicMeeting } from './meetingService.js';
 import { userScopeQuery } from './adminScope.js';
 
 function emitAdmin(event, payload) {
@@ -28,7 +28,8 @@ function toParticipant(session, user) {
 }
 
 export async function getCurrentSession(admin = null) {
-  const liveMeeting = admin ? await getLiveMeetingForAdmin(admin.sub) : null;
+  const accessible = admin ? await getAccessibleLiveMeeting(admin) : null;
+  const liveMeeting = accessible?.meeting ?? null;
   const sessionQuery = { inCall: true };
   if (liveMeeting?.meetingNumber) {
     sessionQuery.meetingId = liveMeeting.meetingNumber;
@@ -49,6 +50,8 @@ export async function getCurrentSession(admin = null) {
     sessionActive: Boolean(liveMeeting) || participants.length > 0,
     meetingLive: Boolean(liveMeeting),
     meeting: liveMeeting ? toPublicMeeting(liveMeeting) : null,
+    meetingOwnedByMe: accessible?.ownedByMe ?? false,
+    canEndMeeting: accessible?.canEnd ?? false,
     participants,
   };
 }

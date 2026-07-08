@@ -52,7 +52,10 @@ router.post('/start', async (req, res) => {
     const meeting = await startMeeting(req.admin);
     res.status(201).json({ meeting });
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message });
+    const body = { error: err.message };
+    if (err.code) body.code = err.code;
+    if (err.meeting) body.meeting = err.meeting;
+    res.status(err.status || 500).json(body);
   }
 });
 

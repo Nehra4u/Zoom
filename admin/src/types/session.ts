@@ -30,6 +30,8 @@ export interface SessionSnapshot {
   sessionActive: boolean
   meetingLive: boolean
   meeting: ActiveMeeting | null
+  meetingOwnedByMe?: boolean
+  canEndMeeting?: boolean
   participants: SessionParticipant[]
 }
 

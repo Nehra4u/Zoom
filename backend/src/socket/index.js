@@ -32,6 +32,7 @@ export function setupSocket(httpServer) {
   adminNS.use(authenticateAdminSocket);
   adminNS.on('connection', (socket) => {
     socket.join('admin:session');
+    socket.join(`admin:${socket.data.admin.sub}`);
     console.log('Admin socket connected:', socket.data.admin.email);
     socket.on('disconnect', () => {
       console.log('Admin socket disconnected:', socket.data.admin.email);
