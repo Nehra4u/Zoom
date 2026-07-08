@@ -44,9 +44,6 @@ export function MeetingPortalHost({ mode }: MeetingPortalHostProps) {
           mode={mode}
           endPending={endMutation.isPending}
           onEndMeeting={canEndMeeting ? () => endMutation.mutate() : undefined}
-          onMeetingEnded={async () => {
-            await endMutation.mutateAsync()
-          }}
         />
       </div>
     </div>

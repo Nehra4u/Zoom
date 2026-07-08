@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import axios from 'axios'
-import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { endMeeting, fetchAdminJoinToken, type AdminJoinCredentials } from '@/api/session'
+import { fetchAdminJoinToken, type AdminJoinCredentials } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -12,7 +10,6 @@ import { useSessionStore } from '@/stores/sessionStore'
 interface MeetingJoinPanelProps {
   meetingLive: boolean
   mode?: 'visible' | 'background'
-  onMeetingEnded?: () => Promise<void>
   onEndMeeting?: () => void
   endPending?: boolean
 }
@@ -24,11 +21,9 @@ interface MeetingJoinPanelProps {
 export function MeetingJoinPanel({
   meetingLive,
   mode = 'visible',
-  onMeetingEnded,
   onEndMeeting,
   endPending = false,
 }: MeetingJoinPanelProps) {
-  const queryClient = useQueryClient()
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const pendingJoinRef = useRef<{ credentials: AdminJoinCredentials; leaveUrl: string } | null>(
     null
@@ -55,22 +50,6 @@ export function MeetingJoinPanel({
     }
   }, [setPortalJoined])
 
-  const syncMeetingEnded = useCallback(async () => {
-    try {
-      if (onMeetingEnded) {
-        await onMeetingEnded()
-      } else {
-        await endMeeting()
-        await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
-        toast.success('Meeting ended')
-      }
-    } catch (err) {
-      if (!axios.isAxiosError(err) || err.response?.status !== 404) {
-        toast.error(getErrorMessage(err))
-      }
-    }
-  }, [onMeetingEnded, queryClient])
-
   useEffect(() => {
     if (!meetingLive) {
       setPortalJoinAttempted(false)
@@ -80,13 +59,6 @@ export function MeetingJoinPanel({
 
   useEffect(() => {
     if (!showFrame) return
-
-    async function handlePortalEnd() {
-      if (endedHandledRef.current) return
-      endedHandledRef.current = true
-      closeFrame()
-      await syncMeetingEnded()
-    }
 
     function onMessage(event: MessageEvent) {
       if (event.origin !== window.location.origin) return
@@ -120,20 +92,17 @@ export function MeetingJoinPanel({
       }
 
       if (data.type === 'ZOOM_LEFT' && data.ended) {
-        void handlePortalEnd()
+        if (endedHandledRef.current) return
+        endedHandledRef.current = true
+        closeFrame()
+        // Allow auto-rejoin while the server-side meeting is still live.
+        setPortalJoinAttempted(false)
       }
     }
 
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [
-    showFrame,
-    closeFrame,
-    syncMeetingEnded,
-    isBackground,
-    setPortalJoined,
-    setPortalJoinAttempted,
-  ])
+  }, [showFrame, closeFrame, isBackground, setPortalJoinAttempted])
 
   useEffect(() => {
     if (!showFrame || !pendingJoinRef.current) return

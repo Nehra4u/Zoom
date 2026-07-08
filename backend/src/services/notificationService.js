@@ -157,6 +157,31 @@ export function forceLogoutUser(userId, reason = 'SESSION_REVOKED') {
   });
 }
 
+export function notifyUserPresence(userId, isOnline) {
+  const io = getIo();
+  if (!io) {
+    console.log(`[notification] user:presence → admins`, { userId, isOnline });
+    return;
+  }
+
+  io.of('/admin').emit('user:presence', {
+    userId: String(userId),
+    isOnline: Boolean(isOnline),
+  });
+}
+
+export function notifySubscriptionExpired() {
+  const io = getIo();
+  if (!io) {
+    console.log('[notification] admin:subscription:expired → all admins');
+    return;
+  }
+
+  io.of('/admin').emit('admin:subscription:expired', {
+    message: 'Your subscription has ended. Please contact Administration for reactivating.',
+  });
+}
+
 export function notifyMeetingUpdated(meetingData = {}) {
   const io = getIo();
   if (!io) {

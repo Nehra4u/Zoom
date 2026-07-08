@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   Bell,
@@ -27,6 +27,7 @@ import { MeetingActiveBanner } from '@/components/MeetingActiveBanner'
 import { MeetingPortalHost } from '@/components/MeetingPortalHost'
 import { RightPanel } from '@/layouts/RightPanel'
 import { useSessionStore } from '@/stores/sessionStore'
+import { fetchSubscription } from '@/api/settings'
 
 interface NavItem {
   to: string
@@ -48,9 +49,35 @@ const RECORDS_ITEMS: NavItem[] = [
   { to: '/system', label: 'Settings', icon: Settings },
 ]
 
-// TODO: wire this up to a real billing/subscription API once one exists.
-// Placeholder renewal date so the UI has something meaningful to render.
-const SUBSCRIPTION_RENEWAL_DATE = new Date('2026-07-19T00:00:00')
+function formatSubscriptionRenewal(endDate: string | null, isActive: boolean) {
+  if (!endDate) {
+    return {
+      daysRemaining: null as number | null,
+      isUrgent: false,
+      formatted: 'Not configured',
+      headline: isActive ? 'Subscription active' : 'Subscription ended',
+      expired: !isActive,
+    }
+  }
+
+  const renewalDate = new Date(endDate)
+  const now = new Date()
+  const msPerDay = 1000 * 60 * 60 * 24
+  const daysRemaining = Math.ceil((renewalDate.getTime() - now.getTime()) / msPerDay)
+  const expired = !isActive
+  const isUrgent = !expired && daysRemaining <= 7
+  const formatted = renewalDate.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+
+  let headline = 'Subscription active'
+  if (expired) headline = 'Subscription ended'
+  else if (isUrgent) headline = `Renews in ${daysRemaining} days`
+
+  return { daysRemaining, isUrgent, formatted, headline, expired }
+}
 
 function getPageHeading(pathname: string, isSuperAdmin: boolean): { title: string; subtitle: string } {
   if (pathname.startsWith('/dashboard')) {
@@ -136,6 +163,12 @@ export function AppShell() {
   useAdminSocket(true)
   useSessionSync()
 
+  const subscriptionQuery = useQuery({
+    queryKey: ['subscription'],
+    queryFn: fetchSubscription,
+    staleTime: 60_000,
+  })
+
   const isDashboard = location.pathname.startsWith('/dashboard')
   const showPortalBackground = meetingLive && !isDashboard
 
@@ -145,18 +178,14 @@ export function AppShell() {
     [location.pathname, isSuperAdmin]
   )
 
-  const renewal = useMemo(() => {
-    const now = new Date()
-    const msPerDay = 1000 * 60 * 60 * 24
-    const daysRemaining = Math.ceil((SUBSCRIPTION_RENEWAL_DATE.getTime() - now.getTime()) / msPerDay)
-    const isUrgent = daysRemaining <= 7
-    const formatted = SUBSCRIPTION_RENEWAL_DATE.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    })
-    return { daysRemaining, isUrgent, formatted }
-  }, [])
+  const renewal = useMemo(
+    () =>
+      formatSubscriptionRenewal(
+        subscriptionQuery.data?.endDate ?? null,
+        subscriptionQuery.data?.isActive ?? true
+      ),
+    [subscriptionQuery.data]
+  )
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -217,7 +246,7 @@ export function AppShell() {
           <div
             className={cn(
               'rounded-xl border p-3',
-              renewal.isUrgent
+              renewal.expired || renewal.isUrgent
                 ? 'border-destructive/20 bg-destructive/10'
                 : 'border-success/20 bg-success/10'
             )}
@@ -226,24 +255,26 @@ export function AppShell() {
               <div
                 className={cn(
                   'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
-                  renewal.isUrgent ? 'bg-destructive/15' : 'bg-success/15'
+                  renewal.expired || renewal.isUrgent ? 'bg-destructive/15' : 'bg-success/15'
                 )}
               >
                 <CalendarCheck2
-                  className={cn('h-4 w-4', renewal.isUrgent ? 'text-destructive' : 'text-success')}
+                  className={cn('h-4 w-4', renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success')}
                 />
               </div>
               <div className="min-w-0">
                 <p
                   className={cn(
                     'text-xs font-semibold',
-                    renewal.isUrgent ? 'text-destructive' : 'text-success'
+                    renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success'
                   )}
                 >
-                  {renewal.isUrgent ? `Renews in ${renewal.daysRemaining} days` : 'Subscription active'}
+                  {renewal.headline}
                 </p>
                 <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                  Next renewal on {renewal.formatted}
+                  {renewal.expired
+                    ? 'Contact Administration to reactivate'
+                    : `Next renewal on ${renewal.formatted}`}
                 </p>
               </div>
             </div>

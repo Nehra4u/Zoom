@@ -10,6 +10,7 @@ export interface Recording {
   fileSize: number
   startedBy: string | null
   createdAt: string
+  expiresAt: string | null
 }
 
 export interface RecordingPlayUrl {

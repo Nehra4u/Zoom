@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
+import axios from 'axios'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,9 +16,16 @@ export function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const queryClient = useQueryClient()
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('subscription') === 'expired') {
+      toast.error('Your subscription has ended. Please contact Administration for reactivating.')
+    }
+  }, [searchParams])
 
   if (isAuthenticated) {
     return <Navigate to={isSuperAdmin ? '/admins' : '/dashboard'} replace />
@@ -34,7 +42,11 @@ export function LoginPage() {
       const defaultPath = loggedIn.role === 'super_admin' ? '/admins' : '/dashboard'
       navigate(from ?? defaultPath, { replace: true })
     } catch (err) {
-      toast.error(getErrorMessage(err))
+      if (axios.isAxiosError(err) && err.response?.data?.code === 'SUBSCRIPTION_EXPIRED') {
+        toast.error('Your subscription has ended. Please contact Administration for reactivating.')
+      } else {
+        toast.error(getErrorMessage(err))
+      }
     } finally {
       setLoading(false)
     }

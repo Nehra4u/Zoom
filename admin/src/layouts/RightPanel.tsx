@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { UserRound, Users } from 'lucide-react'
 import { fetchUsers } from '@/api/users'
 import { fetchHealth } from '@/api/health'
+import { useSessionStore } from '@/stores/sessionStore'
 
 const MAX_LATENCY_SAMPLES = 20
 
@@ -15,6 +16,7 @@ function percentile95(samples: number[]): number | null {
 
 export function RightPanel() {
   const [latencySamples, setLatencySamples] = useState<number[]>([])
+  const socketConnected = useSessionStore((s) => s.socketConnected)
 
   // "Active" here means genuinely online right now (isOnline, via a live websocket) —
   // not just an "Activated" (status === 'active') account. Fetch everyone and filter
@@ -22,7 +24,7 @@ export function RightPanel() {
   const usersQuery = useQuery({
     queryKey: ['users'],
     queryFn: () => fetchUsers(),
-    refetchInterval: 30_000,
+    refetchInterval: socketConnected ? false : 30_000,
   })
 
   useQuery({

@@ -61,7 +61,18 @@ let refreshPromise: Promise<string | null> | null = null
 
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError<{ error?: string }>) => {
+  async (error: AxiosError<{ error?: string; code?: string }>) => {
+    if (
+      error.response?.status === 403 &&
+      error.response.data?.code === 'SUBSCRIPTION_EXPIRED'
+    ) {
+      clearStoredTokens()
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?subscription=expired'
+      }
+      return Promise.reject(error)
+    }
+
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true

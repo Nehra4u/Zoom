@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import {
@@ -13,6 +14,9 @@ import {
   Smartphone,
   User as UserIcon,
 } from 'lucide-react'
+import { changeAdminPassword, updateAdminProfile } from '@/api/auth'
+import { fetchSubscription } from '@/api/settings'
+import { getErrorMessage } from '@/api/client'
 import { useAuth } from '@/auth/AuthContext'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,10 +26,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { cn } from '@/lib/utils'
-
-// TODO: wire this up to a real billing/subscription API once one exists.
-// Placeholder renewal date so the UI has something meaningful to render.
-const SUBSCRIPTION_RENEWAL_DATE = new Date('2026-07-19T00:00:00')
 
 function initials(name?: string) {
   if (!name) return '?'
@@ -42,20 +42,63 @@ function formatDateTime(iso: string | null) {
   return new Date(iso).toLocaleString()
 }
 
+function formatSubscriptionRenewal(endDate: string | null, isActive: boolean) {
+  if (!endDate) {
+    return {
+      daysRemaining: null as number | null,
+      isUrgent: false,
+      formatted: 'Not configured',
+      headline: isActive ? 'Subscription active' : 'Subscription ended',
+      expired: !isActive,
+    }
+  }
+
+  const renewalDate = new Date(endDate)
+  const now = new Date()
+  const msPerDay = 1000 * 60 * 60 * 24
+  const daysRemaining = Math.ceil((renewalDate.getTime() - now.getTime()) / msPerDay)
+  const expired = !isActive
+  const isUrgent = !expired && daysRemaining <= 7
+  const formatted = renewalDate.toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+
+  let headline = 'Subscription active'
+  if (expired) headline = 'Subscription ended'
+  else if (daysRemaining > 0) headline = `Renews in ${daysRemaining} day${daysRemaining === 1 ? '' : 's'}`
+  else headline = 'Renewal due'
+
+  return { daysRemaining, isUrgent, formatted, headline, expired }
+}
+
 interface EditProfileDialogProps {
   open: boolean
   onClose: () => void
   name: string
   email: string
-  phone: string
+  onSaved: (name: string, email: string) => void
 }
 
-function EditProfileDialog({ open, onClose, name, email, phone }: EditProfileDialogProps) {
+function EditProfileDialog({ open, onClose, name, email, onSaved }: EditProfileDialogProps) {
+  const mutation = useMutation({
+    mutationFn: (payload: { name: string; email: string }) => updateAdminProfile(payload),
+    onSuccess: (admin) => {
+      toast.success('Profile updated')
+      onSaved(admin.name, admin.email)
+      onClose()
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    // No backend endpoint for this yet — UI only for now.
-    toast.success('Profile changes saved locally — sync will be enabled soon')
-    onClose()
+    const form = new FormData(e.currentTarget)
+    mutation.mutate({
+      name: String(form.get('name') ?? ''),
+      email: String(form.get('email') ?? ''),
+    })
   }
 
   return (
@@ -74,15 +117,13 @@ function EditProfileDialog({ open, onClose, name, email, phone }: EditProfileDia
             <Label htmlFor="profile-email">Email</Label>
             <Input id="profile-email" name="email" type="email" defaultValue={email} required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="profile-phone">Mobile number</Label>
-            <Input id="profile-phone" name="phone" type="tel" defaultValue={phone} placeholder="Not set" />
-          </div>
           <div className="flex justify-end gap-2 pt-1">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Save changes</Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? 'Saving…' : 'Save changes'}
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -96,16 +137,29 @@ interface ChangePasswordDialogProps {
 }
 
 function ChangePasswordDialog({ open, onClose }: ChangePasswordDialogProps) {
+  const mutation = useMutation({
+    mutationFn: (payload: { currentPassword: string; newPassword: string }) =>
+      changeAdminPassword(payload.currentPassword, payload.newPassword),
+    onSuccess: () => {
+      toast.success('Password updated')
+      onClose()
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
-    if (form.get('newPassword') !== form.get('confirmPassword')) {
+    const newPassword = String(form.get('newPassword') ?? '')
+    const confirmPassword = String(form.get('confirmPassword') ?? '')
+    if (newPassword !== confirmPassword) {
       toast.error('New password and confirmation do not match')
       return
     }
-    // No backend endpoint for this yet — UI only for now.
-    toast.success('Password update queued — sync will be enabled soon')
-    onClose()
+    mutation.mutate({
+      currentPassword: String(form.get('currentPassword') ?? ''),
+      newPassword,
+    })
   }
 
   return (
@@ -132,7 +186,9 @@ function ChangePasswordDialog({ open, onClose }: ChangePasswordDialogProps) {
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Update password</Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? 'Updating…' : 'Update password'}
+            </Button>
           </div>
         </form>
       </DialogContent>
@@ -141,24 +197,26 @@ function ChangePasswordDialog({ open, onClose }: ChangePasswordDialogProps) {
 }
 
 export function SystemPage() {
-  const { admin, isSuperAdmin, logout } = useAuth()
+  const { admin, isSuperAdmin, logout, setAdminProfile } = useAuth()
   const navigate = useNavigate()
   const [editOpen, setEditOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
 
-  const renewal = useMemo(() => {
-    const now = new Date()
-    const msPerDay = 1000 * 60 * 60 * 24
-    const daysRemaining = Math.ceil((SUBSCRIPTION_RENEWAL_DATE.getTime() - now.getTime()) / msPerDay)
-    const isUrgent = daysRemaining <= 7
-    const formatted = SUBSCRIPTION_RENEWAL_DATE.toLocaleDateString('en-GB', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric',
-    })
-    return { daysRemaining, isUrgent, formatted }
-  }, [])
+  const subscriptionQuery = useQuery({
+    queryKey: ['subscription'],
+    queryFn: fetchSubscription,
+    staleTime: 60_000,
+  })
+
+  const renewal = useMemo(
+    () =>
+      formatSubscriptionRenewal(
+        subscriptionQuery.data?.endDate ?? null,
+        subscriptionQuery.data?.isActive ?? true
+      ),
+    [subscriptionQuery.data]
+  )
 
   async function handleLogout() {
     setLoggingOut(true)
@@ -172,9 +230,13 @@ export function SystemPage() {
     }
   }
 
+  function handleProfileSaved(name: string, email: string) {
+    if (!admin) return
+    setAdminProfile({ ...admin, name, email })
+  }
+
   return (
     <div className="space-y-6">
-      {/* Profile summary */}
       <Card>
         <CardContent className="flex flex-col gap-5 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-4">
@@ -212,7 +274,6 @@ export function SystemPage() {
       </Card>
 
       <div className="grid gap-4 md:grid-cols-2">
-        {/* Account details */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -258,7 +319,6 @@ export function SystemPage() {
           </CardContent>
         </Card>
 
-        {/* Subscription */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -271,25 +331,36 @@ export function SystemPage() {
             <div
               className={cn(
                 'rounded-xl border p-4',
-                renewal.isUrgent ? 'border-destructive/20 bg-destructive/10' : 'border-success/20 bg-success/10'
+                renewal.expired || renewal.isUrgent
+                  ? 'border-destructive/20 bg-destructive/10'
+                  : 'border-success/20 bg-success/10'
               )}
             >
               <div className="flex items-start gap-3">
                 <div
                   className={cn(
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                    renewal.isUrgent ? 'bg-destructive/15' : 'bg-success/15'
+                    renewal.expired || renewal.isUrgent ? 'bg-destructive/15' : 'bg-success/15'
                   )}
                 >
-                  <CalendarCheck2 className={cn('h-5 w-5', renewal.isUrgent ? 'text-destructive' : 'text-success')} />
+                  <CalendarCheck2
+                    className={cn('h-5 w-5', renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success')}
+                  />
                 </div>
                 <div>
-                  <p className={cn('text-sm font-semibold', renewal.isUrgent ? 'text-destructive' : 'text-success')}>
-                    {renewal.daysRemaining > 0
-                      ? `Renews in ${renewal.daysRemaining} day${renewal.daysRemaining === 1 ? '' : 's'}`
-                      : 'Renewal due'}
+                  <p
+                    className={cn(
+                      'text-sm font-semibold',
+                      renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success'
+                    )}
+                  >
+                    {renewal.headline}
                   </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">Next renewal on {renewal.formatted}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    {renewal.expired
+                      ? 'Contact Administration to reactivate'
+                      : `Next renewal on ${renewal.formatted}`}
+                  </p>
                 </div>
               </div>
             </div>
@@ -297,7 +368,6 @@ export function SystemPage() {
         </Card>
       </div>
 
-      {/* Logout */}
       <Card>
         <CardContent className="flex items-center justify-between gap-4 pt-6">
           <div>
@@ -316,7 +386,7 @@ export function SystemPage() {
         onClose={() => setEditOpen(false)}
         name={admin?.name ?? ''}
         email={admin?.email ?? ''}
-        phone=""
+        onSaved={handleProfileSaved}
       />
       <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </div>

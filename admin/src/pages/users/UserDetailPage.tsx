@@ -66,10 +66,16 @@ export function UserDetailPage() {
 
   const updateMutation = useMutation({
     mutationFn: () => updateUser(id, { name, email, phone: phone || undefined, zoomDisplayName }),
-    onSuccess: () => {
+    onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       queryClient.invalidateQueries({ queryKey: ['users', id] })
-      toast.success('User updated')
+      const phoneChanged = (phone || null) !== (user?.phone ?? null)
+      toast.success(
+        phoneChanged ? 'User updated — device unlinked for new phone number' : 'User updated'
+      )
+      if (phoneChanged && updated.phone !== undefined) {
+        setPhone(updated.phone ?? '')
+      }
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -147,6 +153,11 @@ export function UserDetailPage() {
             <div className="space-y-2">
               <Label htmlFor="edit-phone">Phone</Label>
               <Input id="edit-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              {phone !== (user.phone ?? '') && (
+                <p className="text-xs text-muted-foreground">
+                  Changing the phone number will unlink the current device so the user can sign in from a new phone.
+                </p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-zoom">Zoom display name</Label>

@@ -1,15 +1,23 @@
 import { Recording } from '../models/Recording.js';
-import { fetchMeetingRecordings, fetchUserRecordings } from './zoomApi.js';
+import { fetchMeetingRecordings, fetchUserRecordings, deleteCloudRecordingFile } from './zoomApi.js';
 import { writeAuditLog } from './auditService.js';
 import { recordingScopeQuery } from './adminScope.js';
 import {
   getRetentionCutoffDate,
+  getRecordingRetentionDays,
   retentionQuery,
 } from './settingsService.js';
 import { enforceRecordingRetention } from './recordingRetentionService.js';
 import { findMeetingByZoomId, resolveHostUserId } from './meetingService.js';
 
-function toPublicRecording(recording) {
+function computeExpiresAt(startTime, retentionDays) {
+  if (!retentionDays || retentionDays < 1 || !startTime) return null;
+  const expiresAt = new Date(startTime);
+  expiresAt.setDate(expiresAt.getDate() + retentionDays);
+  return expiresAt;
+}
+
+function toPublicRecording(recording, retentionDays = null) {
   return {
     id: recording._id.toString(),
     zoomMeetingId: recording.zoomMeetingId,
@@ -22,6 +30,7 @@ function toPublicRecording(recording) {
     fileSize: recording.fileSize,
     startedBy: recording.startedBy?.toString() ?? null,
     createdAt: recording.createdAt,
+    expiresAt: computeExpiresAt(recording.startTime, retentionDays),
   };
 }
 
@@ -105,16 +114,21 @@ function todayIso() {
 export async function listRecordings(admin = null) {
   await enforceRecordingRetention();
   const cutoff = await getRetentionCutoffDate();
+  const retentionDays = await getRecordingRetentionDays();
   const query = { ...recordingScopeQuery(admin), ...retentionQuery(cutoff) };
   const recordings = await Recording.find(query).sort({ startTime: -1 });
-  return recordings.map(toPublicRecording);
+  return {
+    recordings: recordings.map((recording) => toPublicRecording(recording, retentionDays)),
+    recordingRetentionDays: retentionDays,
+  };
 }
 
 export async function getRecordingById(id, admin = null) {
   const query = { _id: id, ...recordingScopeQuery(admin) };
   const recording = await Recording.findOne(query);
   if (!recording) return null;
-  return toPublicRecording(recording);
+  const retentionDays = await getRecordingRetentionDays();
+  return toPublicRecording(recording, retentionDays);
 }
 
 export async function getFreshPlayUrl(id, actor) {
@@ -163,13 +177,30 @@ export async function deleteRecording(id, actor) {
     throw err;
   }
 
+  try {
+    const result = await deleteCloudRecordingFile(doc.zoomMeetingId, doc.zoomRecordingId);
+    if (!result.deleted && !result.notFound) {
+      console.warn('[recording-delete] Zoom cloud delete uncertain:', doc.zoomRecordingId);
+    }
+  } catch (err) {
+    console.error('[recording-delete] Zoom cloud delete failed:', doc.zoomRecordingId, err.message);
+    const deleteErr = new Error('Failed to delete recording from Zoom cloud');
+    deleteErr.status = 502;
+    throw deleteErr;
+  }
+
   await Recording.deleteOne({ _id: doc._id });
 
   if (actor) {
     await writeAuditLog({
       actor,
       action: 'recording_removed',
-      meta: { recordingId: id, zoomRecordingId: doc.zoomRecordingId, topic: doc.topic },
+      meta: {
+        recordingId: id,
+        zoomRecordingId: doc.zoomRecordingId,
+        topic: doc.topic,
+        deletedFromCloud: true,
+      },
     });
   }
 

@@ -1,6 +1,7 @@
 import { SystemSettings } from '../models/SystemSettings.js';
 import { writeAuditLog } from './auditService.js';
 import { enforceRecordingRetention } from './recordingRetentionService.js';
+import { notifySubscriptionExpired } from './notificationService.js';
 
 const SETTINGS_ID = 'global';
 
@@ -8,8 +9,62 @@ export async function getSystemSettings() {
   const doc = await SystemSettings.findById(SETTINGS_ID);
   return {
     recordingRetentionDays: doc?.recordingRetentionDays ?? null,
+    subscriptionEndDate: doc?.subscriptionEndDate ?? null,
     updatedAt: doc?.updatedAt ?? null,
   };
+}
+
+export async function getSubscriptionStatus() {
+  const doc = await SystemSettings.findById(SETTINGS_ID);
+  const endDate = doc?.subscriptionEndDate ?? null;
+  const isActive = !endDate || new Date() <= new Date(endDate);
+  return {
+    endDate,
+    isActive,
+  };
+}
+
+export async function assertSubscriptionActive() {
+  const { isActive } = await getSubscriptionStatus();
+  if (!isActive) {
+    const err = new Error('Your subscription has ended. Please contact Administration for reactivating.');
+    err.status = 403;
+    err.code = 'SUBSCRIPTION_EXPIRED';
+    throw err;
+  }
+}
+
+export async function updateSubscriptionEndDate(endDateInput, actor) {
+  let subscriptionEndDate = null;
+
+  if (endDateInput !== null && endDateInput !== undefined && endDateInput !== '') {
+    const parsed = new Date(endDateInput);
+    if (Number.isNaN(parsed.getTime())) {
+      const err = new Error('Subscription end date must be a valid date');
+      err.status = 400;
+      throw err;
+    }
+    subscriptionEndDate = parsed;
+  }
+
+  await SystemSettings.findByIdAndUpdate(
+    SETTINGS_ID,
+    { subscriptionEndDate, updatedBy: actor.sub },
+    { upsert: true, new: true, setDefaultsOnInsert: true }
+  );
+
+  const status = await getSubscriptionStatus();
+  if (!status.isActive) {
+    notifySubscriptionExpired();
+  }
+
+  await writeAuditLog({
+    actor,
+    action: 'settings_updated',
+    meta: { subscriptionEndDate },
+  });
+
+  return status;
 }
 
 export async function getRecordingRetentionDays() {

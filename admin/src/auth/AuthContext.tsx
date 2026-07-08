@@ -1,11 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import {
   clearStoredTokens,
   getStoredAccessToken,
@@ -24,6 +17,7 @@ interface AuthContextValue {
   isSuperAdmin: boolean
   login: (email: string, password: string) => Promise<Admin>
   logout: () => Promise<void>
+  setAdminProfile: (admin: Admin) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -51,9 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAdmin(null)
   }, [])
 
+  const setAdminProfile = useCallback((nextAdmin: Admin) => {
+    setStoredAdmin(nextAdmin)
+    setAdmin(nextAdmin)
+  }, [])
+
   const value = useMemo(
-    () => ({ admin, isAuthenticated, isSuperAdmin, login, logout }),
-    [admin, isAuthenticated, isSuperAdmin, login, logout]
+    () => ({ admin, isAuthenticated, isSuperAdmin, login, logout, setAdminProfile }),
+    [admin, isAuthenticated, isSuperAdmin, login, logout, setAdminProfile]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

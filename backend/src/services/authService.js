@@ -11,11 +11,14 @@ import {
 } from '../services/tokenService.js';
 import { toPublicAdmin } from '../services/adminService.js';
 import { notifyAdminSessionRevoked } from './notificationService.js';
+import { assertSubscriptionActive } from './settingsService.js';
 
 const MAX_FAILED = 5;
 const LOCKOUT_MINUTES = 5;
 
 export async function loginAdmin(email, password) {
+  await assertSubscriptionActive();
+
   const admin = await Admin.findOne({ email: email.toLowerCase(), status: { $ne: 'deleted' } });
   if (!admin || admin.status !== 'active') {
     const err = new Error('Invalid credentials');
@@ -76,6 +79,8 @@ export async function loginAdmin(email, password) {
 }
 
 export async function refreshAdminToken(refreshToken) {
+  await assertSubscriptionActive();
+
   const tokenHash = hashToken(refreshToken);
   const stored = await AdminRefreshToken.findOne({ tokenHash, revokedAt: null });
   if (!stored || stored.expiresAt < new Date()) {
@@ -125,6 +130,61 @@ export async function logoutAdmin(refreshToken, accessToken) {
       ).catch(() => {});
     }
   }
+}
+
+export async function getCurrentAdminProfile(adminId) {
+  const admin = await Admin.findOne({ _id: adminId, status: { $ne: 'deleted' } });
+  if (!admin) {
+    const err = new Error('Admin not found');
+    err.status = 404;
+    throw err;
+  }
+  return toPublicAdmin(admin);
+}
+
+export async function updateCurrentAdminProfile(adminId, updates) {
+  const admin = await Admin.findOne({ _id: adminId, status: { $ne: 'deleted' } });
+  if (!admin) {
+    const err = new Error('Admin not found');
+    err.status = 404;
+    throw err;
+  }
+
+  if (updates.email && updates.email.toLowerCase() !== admin.email) {
+    const existing = await Admin.findOne({ email: updates.email.toLowerCase() });
+    if (existing) {
+      const err = new Error('Email already in use');
+      err.status = 409;
+      throw err;
+    }
+    admin.email = updates.email.toLowerCase();
+  }
+
+  if (updates.name !== undefined) admin.name = updates.name;
+  await admin.save();
+
+  return toPublicAdmin(admin);
+}
+
+export async function changeCurrentAdminPassword(adminId, currentPassword, newPassword) {
+  const admin = await Admin.findOne({ _id: adminId, status: { $ne: 'deleted' } });
+  if (!admin) {
+    const err = new Error('Admin not found');
+    err.status = 404;
+    throw err;
+  }
+
+  const valid = await bcrypt.compare(currentPassword, admin.passwordHash);
+  if (!valid) {
+    const err = new Error('Current password is incorrect');
+    err.status = 401;
+    throw err;
+  }
+
+  admin.passwordHash = await bcrypt.hash(newPassword, 12);
+  await admin.save();
+
+  return { ok: true };
 }
 
 export { verifyAdminAccessToken };

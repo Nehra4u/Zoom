@@ -7,6 +7,7 @@ import {
   fetchZoomHostUserId,
   isMockMode,
 } from './zoomApi.js';
+import { writeAutomaticAuditLog } from './auditService.js';
 
 const SETTINGS_ID = 'global';
 
@@ -115,6 +116,17 @@ export async function enforceRecordingRetention() {
   const portalZoom = await deleteExpiredPortalRecordingsFromZoom(cutoff);
 
   const portalResult = await Recording.deleteMany({ startTime: { $lt: cutoff } });
+
+  if ((portalResult.deletedCount ?? 0) > 0) {
+    await writeAutomaticAuditLog({
+      action: 'recording_expired',
+      meta: {
+        removedFromPortal: portalResult.deletedCount ?? 0,
+        removedFromCloud: zoomScan.removedFromCloud + portalZoom.removedFromCloud,
+        cutoff: cutoff.toISOString(),
+      },
+    });
+  }
 
   return {
     removedFromCloud: zoomScan.removedFromCloud + portalZoom.removedFromCloud,

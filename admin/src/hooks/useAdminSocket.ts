@@ -11,6 +11,8 @@ import {
 import { useSessionStore } from '@/stores/sessionStore'
 import type { ActiveMeeting, SessionParticipant } from '@/types/session'
 
+import type { ApkUser } from '@/types/user'
+
 function handleSessionRevoked() {
   clearStoredTokens()
   useSessionStore.getState().reset()
@@ -22,6 +24,13 @@ function shouldLogoutOnRevoke(activeSessionId?: string) {
   const mySessionId = getStoredSessionId()
   if (!activeSessionId || !mySessionId) return true
   return mySessionId !== activeSessionId
+}
+
+function handleSubscriptionExpired() {
+  clearStoredTokens()
+  useSessionStore.getState().reset()
+  toast.error('Your subscription has ended. Please contact Administration for reactivating.')
+  window.location.href = '/login'
 }
 
 export function useAdminSocket(enabled = true) {
@@ -71,6 +80,28 @@ export function useAdminSocket(enabled = true) {
       if (!shouldLogoutOnRevoke(payload?.activeSessionId)) return
       socket.disconnect()
       handleSessionRevoked()
+    })
+
+    socket.on('admin:subscription:expired', () => {
+      socket.disconnect()
+      handleSubscriptionExpired()
+    })
+
+    socket.on('user:presence', (payload: { userId?: string; isOnline?: boolean }) => {
+      if (!payload?.userId) return
+      const { userId, isOnline } = payload
+
+      queryClient.setQueryData<ApkUser[]>(['users'], (current) => {
+        if (!current) return current
+        return current.map((user) =>
+          user.id === userId ? { ...user, isOnline: Boolean(isOnline) } : user
+        )
+      })
+
+      queryClient.setQueryData<ApkUser>(['users', userId], (current) => {
+        if (!current) return current
+        return { ...current, isOnline: Boolean(isOnline) }
+      })
     })
 
     socket.on('session:started', (payload: { meeting: ActiveMeeting }) => {

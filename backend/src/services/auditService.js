@@ -10,3 +10,19 @@ export async function writeAuditLog({ actor, action, targetAdminId = null, targe
     meta,
   });
 }
+
+export async function writeAutomaticAuditLog({ action, meta = {} }) {
+  const { Admin } = await import('../models/Admin.js');
+  const systemAdmin = await Admin.findOne({ role: 'super_admin', status: 'active' }).sort({ createdAt: 1 });
+  if (!systemAdmin) {
+    console.warn('[audit] Skipping automatic audit log — no active super admin:', action);
+    return;
+  }
+
+  await AuditLog.create({
+    actorId: systemAdmin._id,
+    actorRole: 'super_admin',
+    action,
+    meta: { ...meta, automatic: true },
+  });
+}

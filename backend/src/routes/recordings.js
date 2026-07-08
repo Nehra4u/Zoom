@@ -14,8 +14,8 @@ router.use(authenticate, adminOnly);
 
 router.get('/', async (req, res) => {
   try {
-    const recordings = await listRecordings(req.admin);
-    res.json({ recordings });
+    const result = await listRecordings(req.admin);
+    res.json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
@@ -24,8 +24,8 @@ router.get('/', async (req, res) => {
 router.post('/sync', async (req, res) => {
   try {
     const result = await syncRecordingsFromZoom(req.admin);
-    const recordings = await listRecordings(req.admin);
-    res.json({ ...result, recordings });
+    const listed = await listRecordings(req.admin);
+    res.json({ ...result, ...listed });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }
