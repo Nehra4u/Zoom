@@ -115,15 +115,16 @@ export function notifyAdminSessionStarted(meeting) {
   io.of('/admin').to('admin:session').emit('session:started', { meeting });
 }
 
-export function notifyAdminSessionRevoked(adminId) {
+export function notifyAdminSessionRevoked(adminId, activeSessionId) {
   const io = getIo();
   if (!io) {
-    console.log(`[notification] admin:session:revoked → ${adminRoom(adminId)}`);
+    console.log(`[notification] admin:session:revoked → ${adminRoom(adminId)}`, { activeSessionId });
     return;
   }
 
   io.of('/admin').to(adminRoom(adminId)).emit('admin:session:revoked', {
     message: 'Logged in from another device.',
+    activeSessionId,
   });
 }
 

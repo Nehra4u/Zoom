@@ -56,9 +56,10 @@ export async function loginAdmin(email, password) {
     { adminId: admin._id, revokedAt: null },
     { revokedAt: new Date() }
   );
-  notifyAdminSessionRevoked(admin._id.toString());
 
-  const accessToken = signAdminAccessToken(admin);
+  const { token: accessToken, sessionId } = signAdminAccessToken(admin);
+  notifyAdminSessionRevoked(admin._id.toString(), sessionId);
+
   const refresh = signAdminRefreshToken(admin._id);
   await AdminRefreshToken.create({
     adminId: admin._id,
@@ -70,6 +71,7 @@ export async function loginAdmin(email, password) {
     accessToken,
     refreshToken: refresh.token,
     admin: toPublicAdmin(admin),
+    sessionId,
   };
 }
 
@@ -92,7 +94,7 @@ export async function refreshAdminToken(refreshToken) {
   stored.revokedAt = new Date();
   await stored.save();
 
-  const accessToken = signAdminAccessToken(admin);
+  const { token: accessToken } = signAdminAccessToken(admin);
   const refresh = signAdminRefreshToken(admin._id);
   await AdminRefreshToken.create({
     adminId: admin._id,

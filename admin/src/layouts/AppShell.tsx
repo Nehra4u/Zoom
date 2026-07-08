@@ -132,7 +132,7 @@ export function AppShell() {
   const location = useLocation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { meetingLive } = useSessionStore()
+  const { meetingLive, socketConnected } = useSessionStore()
   useAdminSocket(true)
   useSessionSync()
 
@@ -278,6 +278,23 @@ export function AppShell() {
           </div>
 
           <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                'flex items-center gap-1.5 rounded-lg px-2 py-1 text-[11px] font-medium',
+                socketConnected
+                  ? 'bg-success/10 text-success'
+                  : 'bg-muted text-muted-foreground'
+              )}
+              title={socketConnected ? 'Realtime connected' : 'Realtime disconnected — polling every 30s'}
+            >
+              <span
+                className={cn(
+                  'h-1.5 w-1.5 rounded-full',
+                  socketConnected ? 'bg-success animate-pulse' : 'bg-muted-foreground'
+                )}
+              />
+              {socketConnected ? 'Live' : 'Offline'}
+            </span>
             {meetingLive && !isDashboard && (
               <button
                 type="button"

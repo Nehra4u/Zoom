@@ -12,6 +12,7 @@ import {
   getStoredAdmin,
   getStoredRefreshToken,
   setStoredAdmin,
+  setStoredSessionId,
   setStoredTokens,
 } from '@/api/client'
 import { loginAdmin as apiLogin, logoutAdmin as apiLogout } from '@/api/admins'
@@ -37,6 +38,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await apiLogin(email, password)
     setStoredTokens(result.accessToken, result.refreshToken)
     setStoredAdmin(result.admin)
+    if (result.sessionId) {
+      setStoredSessionId(result.sessionId)
+    }
     setAdmin(result.admin)
     return result.admin
   }, [])

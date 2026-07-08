@@ -18,6 +18,7 @@ export interface AuthResponse {
   accessToken: string
   refreshToken: string
   admin: Admin
+  sessionId?: string
 }
 
 export interface JwtPayload {
