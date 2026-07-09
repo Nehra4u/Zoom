@@ -10,7 +10,6 @@ import {
   LayoutDashboard,
   RefreshCw,
   Rocket,
-  Search,
   Settings,
   Shield,
   ShieldCheck,

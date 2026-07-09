@@ -23,7 +23,7 @@ function handleSessionRevoked() {
 
 function shouldLogoutOnRevoke(activeSessionId?: string) {
   const mySessionId = getStoredSessionId()
-  if (!activeSessionId || !mySessionId) return true
+  if (!activeSessionId || !mySessionId) return false
   return mySessionId !== activeSessionId
 }
 
