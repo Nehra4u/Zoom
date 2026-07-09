@@ -141,6 +141,8 @@ export async function updateUser(id, updates, actor) {
   }
 
   if (updates.name !== undefined) user.name = updates.name;
+  const phoneChanged =
+    updates.phone !== undefined && (updates.phone || null) !== (user.phone || null);
   if (updates.phone !== undefined) user.phone = updates.phone || null;
   if (updates.zoomDisplayName !== undefined) user.zoomDisplayName = updates.zoomDisplayName;
   if (updates.status !== undefined) user.status = updates.status;
@@ -151,10 +153,15 @@ export async function updateUser(id, updates, actor) {
     actor,
     action: 'user_updated',
     targetUserId: user._id,
-    meta: { updated: Object.keys(updates) },
+    meta: { updated: Object.keys(updates), phoneChanged },
   });
 
-  return toPublicUser(user);
+  if (phoneChanged) {
+    return logoutUserDevices(id, actor);
+  }
+
+  const deviceSession = await DeviceSession.findOne({ userId: user._id }).sort({ lastSeenAt: -1 });
+  return toPublicUser(user, deviceSession, getOnlineUserIds());
 }
 
 export async function activateUser(id, actor) {

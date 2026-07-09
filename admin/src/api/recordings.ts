@@ -2,8 +2,10 @@ import { api } from './client'
 import type { Recording, RecordingPlayUrl } from '@/types/recording'
 
 export async function fetchRecordings() {
-  const { data } = await api.get<{ recordings: Recording[] }>('/recordings')
-  return data.recordings
+  const { data } = await api.get<{ recordings: Recording[]; recordingRetentionDays: number | null }>(
+    '/recordings'
+  )
+  return data
 }
 
 export async function syncRecordingsFromZoom() {
@@ -13,6 +15,7 @@ export async function syncRecordingsFromZoom() {
     from: string
     to: string
     recordings: Recording[]
+    recordingRetentionDays: number | null
   }>('/recordings/sync')
   return data
 }

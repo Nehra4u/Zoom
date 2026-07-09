@@ -15,6 +15,7 @@ export type AuditAction =
   | 'token_revoked'
   | 'recording_accessed'
   | 'recording_removed'
+  | 'recording_expired'
   | 'settings_updated'
 
 export interface AuditLogEntry {

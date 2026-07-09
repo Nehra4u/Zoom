@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ExternalLink, Film, Play, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, ExternalLink, Film, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteRecording, fetchRecordings, fetchRecordingPlayUrl, syncRecordingsFromZoom } from '@/api/recordings'
 import { getErrorMessage } from '@/api/client'
+import { ExpiryCountdown } from '@/components/ExpiryCountdown'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,7 +33,7 @@ function formatFileSize(bytes: number) {
 function RecordingsTableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div className="space-y-3">
-      <div className="hidden sm:grid sm:grid-cols-[2fr_1.5fr_0.75fr_0.5fr_0.75fr_5rem] sm:gap-4 sm:px-2">
+      <div className="hidden sm:grid sm:grid-cols-[2fr_1.5fr_1.25fr_0.75fr_0.5fr_0.75fr_7rem] sm:gap-4 sm:px-2">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={`head-${i}`} className="h-4 w-full" />
         ))}
@@ -41,7 +42,7 @@ function RecordingsTableSkeleton({ rows = 6 }: { rows?: number }) {
         {Array.from({ length: rows }).map((_, row) => (
           <div
             key={row}
-            className="grid grid-cols-1 gap-3 rounded-lg border border-border/50 bg-muted/10 p-3 sm:grid-cols-[2fr_1.5fr_0.75fr_0.5fr_0.75fr_5rem] sm:items-center sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0"
+            className="grid grid-cols-1 gap-3 rounded-lg border border-border/50 bg-muted/10 p-3 sm:grid-cols-[2fr_1.5fr_1.25fr_0.75fr_0.5fr_0.75fr_7rem] sm:items-center sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0"
           >
             <Skeleton className="h-5 w-4/5" />
             <Skeleton className="h-4 w-32" />
@@ -74,12 +75,25 @@ function RecordingRow({
     onError: (err) => toast.error(getErrorMessage(err)),
   })
 
+  const downloadMutation = useMutation({
+    mutationFn: () => fetchRecordingPlayUrl(recording.id),
+    onSuccess: (data) => {
+      if (!data.downloadUrl) {
+        toast.error('Download URL not available from Zoom')
+        return
+      }
+      window.open(data.downloadUrl, '_blank', 'noopener,noreferrer')
+      toast.success('Download started — URL is time-limited')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
   const deleteMutation = useMutation({
     mutationFn: () => deleteRecording(recording.id),
     onSuccess: () => {
       onDeleted(recording.id)
       setDeleteOpen(false)
-      toast.success('Recording removed from portal')
+      toast.success('Recording deleted from Zoom cloud and portal')
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -91,6 +105,9 @@ function RecordingRow({
         <TableCell>{new Date(recording.startTime).toLocaleString()}</TableCell>
         <TableCell>{formatDuration(recording.duration)}</TableCell>
         <TableCell>
+          <ExpiryCountdown expiresAt={recording.expiresAt} recordingId={recording.id} />
+        </TableCell>
+        <TableCell>
           <Badge variant="secondary">{recording.fileType}</Badge>
         </TableCell>
         <TableCell className="text-muted-foreground">{formatFileSize(recording.fileSize)}</TableCell>
@@ -99,7 +116,7 @@ function RecordingRow({
             <Button
               size="sm"
               variant="outline"
-              disabled={playMutation.isPending || deleteMutation.isPending}
+              disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
               onClick={() => playMutation.mutate()}
             >
               {playMutation.isPending ? (
@@ -114,11 +131,26 @@ function RecordingRow({
             <Button
               size="sm"
               variant="outline"
-              disabled={playMutation.isPending || deleteMutation.isPending}
+              disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
+              onClick={() => downloadMutation.mutate()}
+            >
+              {downloadMutation.isPending ? (
+                'Loading…'
+              ) : (
+                <>
+                  <Download className="h-4 w-4" />
+                  Download
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
               onClick={() => setDeleteOpen(true)}
             >
               <Trash2 className="h-4 w-4" />
-              Remove
+              Delete
             </Button>
           </div>
         </TableCell>
@@ -127,10 +159,9 @@ function RecordingRow({
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Remove recording from portal?</DialogTitle>
+            <DialogTitle>Delete recording?</DialogTitle>
             <DialogDescription>
-              This removes <strong>{recording.topic}</strong> from the admin portal only. The file stays in Zoom
-              cloud and may reappear if you sync again.
+              This permanently deletes <strong>{recording.topic}</strong> from Zoom cloud and the admin portal.
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-3">
@@ -142,7 +173,7 @@ function RecordingRow({
               disabled={deleteMutation.isPending}
               onClick={() => deleteMutation.mutate()}
             >
-              Remove
+              Delete
             </Button>
           </div>
         </DialogContent>
@@ -155,11 +186,14 @@ export function RecordingListPage() {
   const queryClient = useQueryClient()
   const autoSyncedRef = useRef(false)
 
-  const { data: recordings = [], isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['recordings'],
     queryFn: fetchRecordings,
     staleTime: 60_000,
   })
+
+  const recordings = data?.recordings ?? []
+  const recordingRetentionDays = data?.recordingRetentionDays ?? null
 
   const syncMutation = useMutation({
     mutationFn: async (opts?: { manual?: boolean }) => {
@@ -167,7 +201,10 @@ export function RecordingListPage() {
       return { ...result, manual: opts?.manual ?? false }
     },
     onSuccess: (result) => {
-      queryClient.setQueryData(['recordings'], result.recordings)
+      queryClient.setQueryData(['recordings'], {
+        recordings: result.recordings,
+        recordingRetentionDays: result.recordingRetentionDays ?? recordingRetentionDays,
+      })
       if (result.manual) {
         toast.success(
           result.synced > 0
@@ -195,8 +232,12 @@ export function RecordingListPage() {
   const isSyncing = syncMutation.isPending
 
   function handleRecordingDeleted(id: string) {
-    queryClient.setQueryData<Recording[]>(['recordings'], (current = []) =>
-      current.filter((recording) => recording.id !== id)
+    queryClient.setQueryData<{ recordings: Recording[]; recordingRetentionDays: number | null }>(
+      ['recordings'],
+      (current) => ({
+        recordings: (current?.recordings ?? []).filter((recording) => recording.id !== id),
+        recordingRetentionDays: current?.recordingRetentionDays ?? recordingRetentionDays,
+      })
     )
   }
 
@@ -215,6 +256,9 @@ export function RecordingListPage() {
               <CardDescription>
                 {recordings.length} recording{recordings.length !== 1 ? 's' : ''}. URLs expire — click Play to fetch a
                 new one.
+                {recordingRetentionDays
+                  ? ` Recordings are kept for ${recordingRetentionDays} day${recordingRetentionDays === 1 ? '' : 's'}.`
+                  : null}
                 {isSyncing && recordings.length === 0 ? (
                   <span className="ml-2 text-foreground/80">Syncing from Zoom…</span>
                 ) : null}
@@ -255,6 +299,7 @@ export function RecordingListPage() {
                   <TableHead>Topic</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Duration</TableHead>
+                  <TableHead>Expires</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Size</TableHead>
                   <TableHead className="text-right">Action</TableHead>

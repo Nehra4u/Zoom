@@ -1,8 +1,25 @@
 import { Router } from 'express';
-import { authenticate, superAdminOnly } from '../middleware/authenticate.js';
-import { getSystemSettings, updateRecordingRetentionDays } from '../services/settingsService.js';
+import { authenticate, adminOnly, superAdminOnly } from '../middleware/authenticate.js';
+import {
+  getSystemSettings,
+  getSubscriptionStatus,
+  updateRecordingRetentionDays,
+  updateSubscriptionEndDate,
+} from '../services/settingsService.js';
 
 const router = Router();
+
+router.get('/subscription', authenticate, adminOnly, async (_req, res) => {
+  try {
+    const subscription = await getSubscriptionStatus();
+    res.json({
+      endDate: subscription.endDate,
+      isActive: subscription.isActive,
+    });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
 
 router.use(authenticate, superAdminOnly);
 
@@ -22,6 +39,16 @@ router.patch('/recording-retention', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.patch('/subscription', async (req, res) => {
+  try {
+    const { endDate } = req.body ?? {};
+    const subscription = await updateSubscriptionEndDate(endDate ?? null, req.admin);
+    res.json({ subscription });
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message, code: err.code });
   }
 });
 

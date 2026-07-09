@@ -1,17 +1,11 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useMemo,
-  useState,
-  type ReactNode,
-} from 'react'
+import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
 import {
   clearStoredTokens,
   getStoredAccessToken,
   getStoredAdmin,
   getStoredRefreshToken,
   setStoredAdmin,
+  setStoredSessionId,
   setStoredTokens,
 } from '@/api/client'
 import { loginAdmin as apiLogin, logoutAdmin as apiLogout } from '@/api/admins'
@@ -23,6 +17,7 @@ interface AuthContextValue {
   isSuperAdmin: boolean
   login: (email: string, password: string) => Promise<Admin>
   logout: () => Promise<void>
+  setAdminProfile: (admin: Admin) => void
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -37,6 +32,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await apiLogin(email, password)
     setStoredTokens(result.accessToken, result.refreshToken)
     setStoredAdmin(result.admin)
+    if (result.sessionId) {
+      setStoredSessionId(result.sessionId)
+    }
     setAdmin(result.admin)
     return result.admin
   }, [])
@@ -47,9 +45,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAdmin(null)
   }, [])
 
+  const setAdminProfile = useCallback((nextAdmin: Admin) => {
+    setStoredAdmin(nextAdmin)
+    setAdmin(nextAdmin)
+  }, [])
+
   const value = useMemo(
-    () => ({ admin, isAuthenticated, isSuperAdmin, login, logout }),
-    [admin, isAuthenticated, isSuperAdmin, login, logout]
+    () => ({ admin, isAuthenticated, isSuperAdmin, login, logout, setAdminProfile }),
+    [admin, isAuthenticated, isSuperAdmin, login, logout, setAdminProfile]
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

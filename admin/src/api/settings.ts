@@ -2,7 +2,18 @@ import { api } from './client'
 
 export interface SystemSettings {
   recordingRetentionDays: number | null
+  subscriptionEndDate: string | null
   updatedAt: string | null
+}
+
+export interface SubscriptionStatus {
+  endDate: string | null
+  isActive: boolean
+}
+
+export async function fetchSubscription() {
+  const { data } = await api.get<SubscriptionStatus>('/settings/subscription')
+  return data
 }
 
 export async function fetchSystemSettings() {

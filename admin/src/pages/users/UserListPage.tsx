@@ -4,6 +4,7 @@ import { Ban, LogOut, Plus, Search } from 'lucide-react'
 import { fetchUsers } from '@/api/users'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useSessionStore } from '@/stores/sessionStore'
 import { MAX_USERS } from '@/types/user'
 import type { ApkUser } from '@/types/user'
 import { UserCreateDialog } from './UserCreateDialog'
@@ -29,11 +30,12 @@ function initials(name: string) {
     .join('')
 }
 
-function formatLastSeen(iso: string | null) {
+function formatLastSeen(iso: string | null, isOnline: boolean) {
+  if (isOnline) return 'Active now'
   if (!iso) return 'Never active'
   const diffMs = Date.now() - new Date(iso).getTime()
   const mins = Math.floor(diffMs / 60_000)
-  if (mins < 1) return 'Active now'
+  if (mins < 1) return 'Just now'
   if (mins < 60) return `${mins}m ago`
   const hours = Math.floor(mins / 60)
   if (hours < 24) return `${hours}h ago`
@@ -48,10 +50,12 @@ export function UserListPage() {
   const [editingUser, setEditingUser] = useState<ApkUser | null>(null)
   const [statusUser, setStatusUser] = useState<ApkUser | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const socketConnected = useSessionStore((s) => s.socketConnected)
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: () => fetchUsers(),
+    refetchInterval: socketConnected ? false : 30_000,
   })
 
   function handleSearchChange(value: string) {
@@ -192,7 +196,7 @@ export function UserListPage() {
                 <div className="min-w-0 flex-1">{avatarBlock}</div>
                 <div className="hidden shrink-0 text-right sm:block">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Last seen</p>
-                  <p className="text-sm font-medium text-foreground">{formatLastSeen(user.lastSeenAt)}</p>
+                  <p className="text-sm font-medium text-foreground">{formatLastSeen(user.lastSeenAt, user.isOnline)}</p>
                 </div>
                 {actionButtons}
               </div>

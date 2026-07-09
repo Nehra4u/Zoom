@@ -21,19 +21,21 @@ export function hashToken(token) {
   return crypto.createHash('sha256').update(token).digest('hex');
 }
 
-export function signAdminAccessToken(admin) {
+export function signAdminAccessToken(admin, sessionId = crypto.randomBytes(16).toString('hex')) {
   const jti = crypto.randomBytes(16).toString('hex');
-  return jwt.sign(
+  const token = jwt.sign(
     {
       sub: admin._id.toString(),
       role: admin.role,
       type: 'admin',
       email: admin.email,
       jti,
+      sid: sessionId,
     },
     adminSecret(),
     { expiresIn: ACCESS_TTL }
   );
+  return { token, sessionId };
 }
 
 export function signAdminRefreshToken(adminId) {

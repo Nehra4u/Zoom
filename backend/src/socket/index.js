@@ -2,7 +2,7 @@ import { Server } from 'socket.io';
 import { User } from '../models/User.js';
 import { DeviceSession } from '../models/DeviceSession.js';
 import { setIo, getIo } from '../services/io.js';
-import { sendStatusSync } from '../services/notificationService.js';
+import { notifyUserPresence, sendStatusSync } from '../services/notificationService.js';
 import { authenticateAdminSocket, authenticateClientSocket } from './middleware.js';
 
 // "Online" here means a live, currently-connected /client websocket for that user —
@@ -51,6 +51,8 @@ export function setupSocket(httpServer) {
       await sendStatusSync(socket, user);
     }
 
+    notifyUserPresence(userId, true);
+
     socket.on('HEARTBEAT', async (data) => {
       const deviceId = data?.deviceId ?? null;
 
@@ -69,6 +71,7 @@ export function setupSocket(httpServer) {
 
     socket.on('disconnect', () => {
       console.log('Client socket disconnected:', userId);
+      notifyUserPresence(userId, false);
     });
   });
 

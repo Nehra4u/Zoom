@@ -89,18 +89,8 @@
           disableCORP: !window.crossOriginIsolated,
           success: function () {
             setStatus('Joining meeting…')
-            var leftNotified = false
-            function notifyLeft() {
-              if (leftNotified) return
-              leftNotified = true
-              window.parent.postMessage({ type: 'ZOOM_LEFT', ended: true }, window.location.origin)
-            }
-
-            ZoomMtg.inMeetingServiceListener('onMeetingStatus', function (data) {
-              if (data && data.meetingStatus === 3) {
-                notifyLeft()
-              }
-            })
+            // Intentional leave is handled via leaveUrl → zoom-leave.html (posts ZOOM_LEFT).
+            // Do not treat meetingStatus 3 (transient disconnect / tab background) as leave.
 
             var joinParams = {
               signature: credentials.sdkJwt,

@@ -115,15 +115,16 @@ export function notifyAdminSessionStarted(meeting) {
   io.of('/admin').to('admin:session').emit('session:started', { meeting });
 }
 
-export function notifyAdminSessionRevoked(adminId) {
+export function notifyAdminSessionRevoked(adminId, activeSessionId) {
   const io = getIo();
   if (!io) {
-    console.log(`[notification] admin:session:revoked → ${adminRoom(adminId)}`);
+    console.log(`[notification] admin:session:revoked → ${adminRoom(adminId)}`, { activeSessionId });
     return;
   }
 
   io.of('/admin').to(adminRoom(adminId)).emit('admin:session:revoked', {
     message: 'Logged in from another device.',
+    activeSessionId,
   });
 }
 
@@ -153,6 +154,31 @@ export function forceLogoutUser(userId, reason = 'SESSION_REVOKED') {
     status: 'LOGGED_OUT',
     reason,
     message: 'You have been logged out. Please login again.',
+  });
+}
+
+export function notifyUserPresence(userId, isOnline) {
+  const io = getIo();
+  if (!io) {
+    console.log(`[notification] user:presence → admins`, { userId, isOnline });
+    return;
+  }
+
+  io.of('/admin').emit('user:presence', {
+    userId: String(userId),
+    isOnline: Boolean(isOnline),
+  });
+}
+
+export function notifySubscriptionExpired() {
+  const io = getIo();
+  if (!io) {
+    console.log('[notification] admin:subscription:expired → all admins');
+    return;
+  }
+
+  io.of('/admin').emit('admin:subscription:expired', {
+    message: 'Your subscription has ended. Please contact Administration for reactivating.',
   });
 }
 

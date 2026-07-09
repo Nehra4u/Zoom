@@ -3,9 +3,16 @@ import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
 const ACCESS_KEY = 'zc_access_token'
 const REFRESH_KEY = 'zc_refresh_token'
 const ADMIN_KEY = 'zc_admin'
+const SESSION_ID_KEY = 'zc_session_id'
+
+export const TOKEN_REFRESH_EVENT = 'zc:token-refreshed'
 
 export function getStoredAccessToken() {
   return sessionStorage.getItem(ACCESS_KEY)
+}
+
+export function getStoredSessionId() {
+  return sessionStorage.getItem(SESSION_ID_KEY)
 }
 
 export function getStoredRefreshToken() {
@@ -17,10 +24,15 @@ export function setStoredTokens(accessToken: string, refreshToken: string) {
   sessionStorage.setItem(REFRESH_KEY, refreshToken)
 }
 
+export function setStoredSessionId(sessionId: string) {
+  sessionStorage.setItem(SESSION_ID_KEY, sessionId)
+}
+
 export function clearStoredTokens() {
   sessionStorage.removeItem(ACCESS_KEY)
   sessionStorage.removeItem(REFRESH_KEY)
   sessionStorage.removeItem(ADMIN_KEY)
+  sessionStorage.removeItem(SESSION_ID_KEY)
 }
 
 export function getStoredAdmin<T>() {
@@ -49,7 +61,18 @@ let refreshPromise: Promise<string | null> | null = null
 
 api.interceptors.response.use(
   (response) => response,
-  async (error: AxiosError<{ error?: string }>) => {
+  async (error: AxiosError<{ error?: string; code?: string }>) => {
+    if (
+      error.response?.status === 403 &&
+      error.response.data?.code === 'SUBSCRIPTION_EXPIRED'
+    ) {
+      clearStoredTokens()
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login?subscription=expired'
+      }
+      return Promise.reject(error)
+    }
+
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean }
     if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true
@@ -61,6 +84,7 @@ api.interceptors.response.use(
             const { data } = await axios.post('/api/auth/admin/refresh', { refreshToken })
             setStoredTokens(data.accessToken, data.refreshToken)
             setStoredAdmin(data.admin)
+            window.dispatchEvent(new CustomEvent(TOKEN_REFRESH_EVENT))
             return data.accessToken as string
           } catch {
             clearStoredTokens()

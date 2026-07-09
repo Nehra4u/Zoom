@@ -2,9 +2,16 @@ import { useEffect, useRef } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { clearStoredTokens, getStoredAccessToken } from '@/api/client'
+import {
+  clearStoredTokens,
+  getStoredAccessToken,
+  getStoredSessionId,
+  TOKEN_REFRESH_EVENT,
+} from '@/api/client'
 import { useSessionStore } from '@/stores/sessionStore'
 import type { ActiveMeeting, SessionParticipant } from '@/types/session'
+
+import type { ApkUser } from '@/types/user'
 
 function handleSessionRevoked() {
   clearStoredTokens()
@@ -13,9 +20,23 @@ function handleSessionRevoked() {
   window.location.href = '/login'
 }
 
+function shouldLogoutOnRevoke(activeSessionId?: string) {
+  const mySessionId = getStoredSessionId()
+  if (!activeSessionId || !mySessionId) return true
+  return mySessionId !== activeSessionId
+}
+
+function handleSubscriptionExpired() {
+  clearStoredTokens()
+  useSessionStore.getState().reset()
+  toast.error('Your subscription has ended. Please contact Administration for reactivating.')
+  window.location.href = '/login'
+}
+
 export function useAdminSocket(enabled = true) {
   const socketRef = useRef<Socket | null>(null)
   const queryClient = useQueryClient()
+  const accessToken = getStoredAccessToken()
   const {
     upsertParticipant,
     removeParticipant,
@@ -26,18 +47,25 @@ export function useAdminSocket(enabled = true) {
   } = useSessionStore()
 
   useEffect(() => {
-    if (!enabled) return
-
-    const token = getStoredAccessToken()
-    if (!token) return
+    if (!enabled || !accessToken) return
 
     const socket = io('/admin', {
-      auth: { token },
+      auth: { token: accessToken },
       transports: ['websocket', 'polling'],
       reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
     })
 
     socketRef.current = socket
+
+    const refreshAuth = () => {
+      const token = getStoredAccessToken()
+      if (token) {
+        socket.auth = { token }
+      }
+    }
 
     socket.on('connect', () => {
       setSocketConnected(true)
@@ -46,9 +74,34 @@ export function useAdminSocket(enabled = true) {
     socket.on('disconnect', () => setSocketConnected(false))
     socket.on('connect_error', () => setSocketConnected(false))
 
-    socket.on('admin:session:revoked', () => {
+    socket.io.on('reconnect_attempt', refreshAuth)
+
+    socket.on('admin:session:revoked', (payload: { activeSessionId?: string }) => {
+      if (!shouldLogoutOnRevoke(payload?.activeSessionId)) return
       socket.disconnect()
       handleSessionRevoked()
+    })
+
+    socket.on('admin:subscription:expired', () => {
+      socket.disconnect()
+      handleSubscriptionExpired()
+    })
+
+    socket.on('user:presence', (payload: { userId?: string; isOnline?: boolean }) => {
+      if (!payload?.userId) return
+      const { userId, isOnline } = payload
+
+      queryClient.setQueryData<ApkUser[]>(['users'], (current) => {
+        if (!current) return current
+        return current.map((user) =>
+          user.id === userId ? { ...user, isOnline: Boolean(isOnline) } : user
+        )
+      })
+
+      queryClient.setQueryData<ApkUser>(['users', userId], (current) => {
+        if (!current) return current
+        return { ...current, isOnline: Boolean(isOnline) }
+      })
     })
 
     socket.on('session:started', (payload: { meeting: ActiveMeeting }) => {
@@ -95,13 +148,24 @@ export function useAdminSocket(enabled = true) {
       )
     })
 
+    function onTokenRefreshed() {
+      refreshAuth()
+      if (!socket.connected) {
+        socket.connect()
+      }
+    }
+
+    window.addEventListener(TOKEN_REFRESH_EVENT, onTokenRefreshed)
+
     return () => {
+      window.removeEventListener(TOKEN_REFRESH_EVENT, onTokenRefreshed)
       socket.disconnect()
       socketRef.current = null
       setSocketConnected(false)
     }
   }, [
     enabled,
+    accessToken,
     upsertParticipant,
     removeParticipant,
     updateMute,
