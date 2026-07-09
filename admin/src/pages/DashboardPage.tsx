@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { useEffect, useState } from 'react'
-import { Video } from 'lucide-react'
+import { CalendarDays, CheckCircle2, ShieldCheck, Video, Wifi } from 'lucide-react'
 import { toast } from 'sonner'
 import { startMeeting } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
@@ -71,36 +71,76 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-10">
-      <div className="text-center">
-        <p className="text-2xl font-semibold tracking-tight text-foreground">{formatTime(now)}</p>
-        <p className="mt-1 text-sm text-muted-foreground">{formatDate(now)}</p>
-      </div>
+    <div className="relative flex min-h-full items-center justify-center py-6">
+      <section className="glass-card relative w-full max-w-4xl overflow-hidden rounded-[2rem] p-6 sm:p-8 lg:p-10">
+        <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-chart-1/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-28 left-12 h-64 w-64 rounded-full bg-violet-300/20 blur-3xl" />
 
-      <div className="flex flex-col items-center gap-4">
-        <button
-          type="button"
-          disabled={startMutation.isPending}
-          onClick={() => startMutation.mutate()}
-          className="group relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-full bg-gradient-to-br from-chart-1 to-blue-700 text-primary-foreground shadow-[0_12px_28px_-6px_rgba(37,99,235,0.55)] transition-all duration-300 hover:scale-105 hover:shadow-[0_16px_34px_-4px_rgba(37,99,235,0.65)] active:scale-95 active:shadow-[0_6px_16px_-4px_rgba(37,99,235,0.5)] disabled:opacity-60 disabled:animate-none animate-button-float"
-          aria-label="Start new meeting"
-        >
-          {!startMutation.isPending && (
-            <>
-              <span className="absolute inset-0 rounded-full bg-chart-1/40 animate-ring-pulse" />
-              <span
-                className="absolute inset-0 rounded-full bg-chart-1/40 animate-ring-pulse"
-                style={{ animationDelay: '1.5s' }}
-              />
-            </>
-          )}
-          <span className="absolute inset-0 rounded-full bg-gradient-to-b from-white/30 via-white/0 to-black/10" />
-          <Video className="relative h-7 w-7" />
-        </button>
-        <p className="text-lg font-semibold text-foreground">
-          {startMutation.isPending ? 'Starting meeting…' : 'Start New Meeting'}
-        </p>
-      </div>
+        <div className="relative grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-success/15 bg-success/10 px-3 py-1.5 text-xs font-semibold text-success">
+              <CheckCircle2 className="h-3.5 w-3.5" />
+              Workspace ready
+            </div>
+            <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-chart-1">
+              {formatDate(now)}
+            </p>
+            <h2 className="mt-2 text-4xl font-bold tracking-[-0.05em] text-foreground sm:text-5xl">
+              {formatTime(now)}
+            </h2>
+            <h3 className="mt-7 max-w-md text-2xl font-bold leading-tight tracking-[-0.035em] text-foreground">
+              Ready for your next secure meeting?
+            </h3>
+            <p className="mt-3 max-w-lg text-sm leading-6 text-muted-foreground">
+              Start a protected ZoomMeets session and connected users will be notified automatically.
+            </p>
+
+            <div className="mt-7 grid gap-3 sm:grid-cols-3">
+              {[
+                { icon: ShieldCheck, title: 'Protected', detail: 'Secure session' },
+                { icon: Wifi, title: 'Connected', detail: 'Realtime sync' },
+                { icon: CalendarDays, title: 'Available', detail: 'Start anytime' },
+              ].map(({ icon: Icon, title, detail }) => (
+                <div key={title} className="rounded-2xl border border-white/80 bg-white/48 p-3.5 shadow-sm backdrop-blur-xl">
+                  <Icon className="h-4 w-4 text-chart-1" />
+                  <p className="mt-2 text-xs font-bold text-foreground">{title}</p>
+                  <p className="mt-0.5 text-[11px] text-muted-foreground">{detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/48 px-6 py-8 shadow-[0_24px_45px_-32px_rgba(37,99,235,0.5)] backdrop-blur-xl">
+            <div className="relative flex h-40 w-40 items-center justify-center overflow-hidden rounded-full">
+              {!startMutation.isPending && (
+                <>
+                  <span className="absolute h-24 w-24 rounded-full border border-chart-1/35 bg-chart-1/15 animate-ring-pulse" />
+                  <span
+                    className="absolute h-24 w-24 rounded-full border border-chart-1/35 bg-chart-1/15 animate-ring-pulse"
+                    style={{ animationDelay: '1.5s' }}
+                  />
+                </>
+              )}
+              <button
+                type="button"
+                disabled={startMutation.isPending}
+                onClick={() => startMutation.mutate()}
+                className="group relative z-10 flex h-24 w-24 cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-blue-500 via-chart-1 to-indigo-600 text-primary-foreground shadow-[0_18px_38px_-8px_rgba(37,99,235,0.58)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_24px_46px_-8px_rgba(37,99,235,0.65)] active:translate-y-0 active:shadow-[0_10px_24px_-8px_rgba(37,99,235,0.5)] disabled:cursor-not-allowed disabled:opacity-60 disabled:animate-none animate-button-float"
+                aria-label="Start new meeting"
+              >
+                <span className="absolute inset-0 rounded-full bg-gradient-to-b from-white/35 via-white/0 to-blue-950/10" />
+                <Video className="relative h-9 w-9" />
+              </button>
+            </div>
+            <p className="mt-7 text-lg font-bold text-foreground">
+              {startMutation.isPending ? 'Starting meeting…' : 'Start New Meeting'}
+            </p>
+            <p className="mt-1 text-center text-xs leading-5 text-muted-foreground">
+              One click to launch and notify participants
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

@@ -3,15 +3,12 @@ import { toast } from 'sonner'
 import { fetchAdminJoinToken, type AdminJoinCredentials } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useSessionStore } from '@/stores/sessionStore'
 
 interface MeetingJoinPanelProps {
   meetingLive: boolean
   mode?: 'visible' | 'background'
-  onEndMeeting?: () => void
-  endPending?: boolean
 }
 
 /**
@@ -21,8 +18,6 @@ interface MeetingJoinPanelProps {
 export function MeetingJoinPanel({
   meetingLive,
   mode = 'visible',
-  onEndMeeting,
-  endPending = false,
 }: MeetingJoinPanelProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const pendingJoinRef = useRef<{ credentials: AdminJoinCredentials; leaveUrl: string } | null>(
@@ -193,19 +188,6 @@ export function MeetingJoinPanel({
           isBackground && 'p-0'
         )}
       >
-        {!isBackground && onEndMeeting && (
-          <div className={cn('flex justify-end', showFrame && 'absolute right-4 top-4 z-10')}>
-            <Button
-              variant="destructive"
-              size="sm"
-              disabled={endPending}
-              onClick={onEndMeeting}
-            >
-              {endPending ? 'Ending…' : 'End meeting'}
-            </Button>
-          </div>
-        )}
-
         {joining && !showFrame && !isBackground && (
           <p className="text-sm text-muted-foreground">Joining meeting in portal…</p>
         )}

@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, ExternalLink, Film, Play, RefreshCw, Trash2 } from 'lucide-react'
+import { Download, ExternalLink, Film, LoaderCircle, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteRecording, fetchRecordings, fetchRecordingPlayUrl, syncRecordingsFromZoom } from '@/api/recordings'
 import { getErrorMessage } from '@/api/client'
 import { ExpiryCountdown } from '@/components/ExpiryCountdown'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -33,7 +32,7 @@ function formatFileSize(bytes: number) {
 function RecordingsTableSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div className="space-y-3">
-      <div className="hidden sm:grid sm:grid-cols-[2fr_1.5fr_1.25fr_0.75fr_0.5fr_0.75fr_7rem] sm:gap-4 sm:px-2">
+      <div className="hidden sm:grid sm:grid-cols-[2fr_1.5fr_1.25fr_1fr_0.75fr_7rem] sm:gap-4 sm:px-2">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton key={`head-${i}`} className="h-4 w-full" />
         ))}
@@ -42,7 +41,7 @@ function RecordingsTableSkeleton({ rows = 6 }: { rows?: number }) {
         {Array.from({ length: rows }).map((_, row) => (
           <div
             key={row}
-            className="grid grid-cols-1 gap-3 rounded-lg border border-border/50 bg-muted/10 p-3 sm:grid-cols-[2fr_1.5fr_1.25fr_0.75fr_0.5fr_0.75fr_7rem] sm:items-center sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0"
+            className="grid grid-cols-1 gap-3 rounded-lg border border-border/50 bg-muted/10 p-3 sm:grid-cols-[2fr_1.5fr_1.25fr_1fr_0.75fr_7rem] sm:items-center sm:gap-4 sm:border-0 sm:bg-transparent sm:p-0"
           >
             <Skeleton className="h-5 w-4/5" />
             <Skeleton className="h-4 w-32" />
@@ -107,50 +106,38 @@ function RecordingRow({
         <TableCell>
           <ExpiryCountdown expiresAt={recording.expiresAt} recordingId={recording.id} />
         </TableCell>
-        <TableCell>
-          <Badge variant="secondary">{recording.fileType}</Badge>
-        </TableCell>
         <TableCell className="text-muted-foreground">{formatFileSize(recording.fileSize)}</TableCell>
         <TableCell className="text-right">
           <div className="flex justify-end gap-2">
             <Button
-              size="sm"
+              size="icon-sm"
               variant="outline"
               disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
               onClick={() => playMutation.mutate()}
+              aria-label={`Play ${recording.topic}`}
+              title="Play recording"
             >
-              {playMutation.isPending ? (
-                'Loading…'
-              ) : (
-                <>
-                  <Play className="h-4 w-4" />
-                  Play
-                </>
-              )}
+              {playMutation.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
             </Button>
             <Button
-              size="sm"
+              size="icon-sm"
               variant="outline"
               disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
               onClick={() => downloadMutation.mutate()}
+              aria-label={`Download ${recording.topic}`}
+              title="Download recording"
             >
-              {downloadMutation.isPending ? (
-                'Loading…'
-              ) : (
-                <>
-                  <Download className="h-4 w-4" />
-                  Download
-                </>
-              )}
+              {downloadMutation.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             </Button>
             <Button
-              size="sm"
+              size="icon-sm"
               variant="outline"
               disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
               onClick={() => setDeleteOpen(true)}
+              aria-label={`Delete ${recording.topic}`}
+              title="Delete recording"
             >
               <Trash2 className="h-4 w-4" />
-              Delete
             </Button>
           </div>
         </TableCell>
@@ -300,7 +287,6 @@ export function RecordingListPage() {
                   <TableHead>Date</TableHead>
                   <TableHead>Duration</TableHead>
                   <TableHead>Expires</TableHead>
-                  <TableHead>Type</TableHead>
                   <TableHead>Size</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>

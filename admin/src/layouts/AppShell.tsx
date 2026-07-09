@@ -1,21 +1,20 @@
 import { useMemo } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   Bell,
   CalendarCheck2,
+  ChevronRight,
   ClipboardList,
   Film,
   LayoutDashboard,
-  RefreshCw,
   Rocket,
   Settings,
   Shield,
   ShieldCheck,
   UserRound,
   Users,
-  Video,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -27,6 +26,7 @@ import { MeetingPortalHost } from '@/components/MeetingPortalHost'
 import { RightPanel } from '@/layouts/RightPanel'
 import { useSessionStore } from '@/stores/sessionStore'
 import { fetchSubscription } from '@/api/settings'
+import logo from '@/assets/logo.svg'
 
 interface NavItem {
   to: string
@@ -139,8 +139,8 @@ function NavButton({ item, meetingLive }: { item: NavItem; meetingLive?: boolean
           'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-200',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
           isActive
-            ? 'bg-primary text-primary-foreground font-medium shadow-sm'
-            : 'text-foreground/80 hover:bg-muted/80 hover:text-foreground'
+            ? 'bg-primary text-primary-foreground font-medium shadow-lg shadow-primary/20'
+            : 'text-foreground/75 hover:bg-white/65 hover:text-foreground hover:shadow-sm'
         )
       }
     >
@@ -157,7 +157,6 @@ export function AppShell() {
   const { admin, isSuperAdmin } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const queryClient = useQueryClient()
   const { meetingLive, socketConnected } = useSessionStore()
   useAdminSocket(true)
   useSessionSync()
@@ -187,14 +186,12 @@ export function AppShell() {
   )
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="app-surface flex h-screen overflow-hidden">
       {/* Left Sidebar */}
-      <aside className="flex h-screen w-[260px] shrink-0 flex-col border-r border-border bg-card">
+      <aside className="flex h-screen w-[260px] shrink-0 flex-col border-r border-white/70 bg-card/70 shadow-[12px_0_40px_-34px_rgba(30,64,175,0.35)] backdrop-blur-2xl">
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 border-b border-border px-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-chart-1">
-            <Video className="h-5 w-5 text-primary-foreground" />
-          </div>
+        <div className="flex h-16 items-center gap-3 border-b border-white/70 px-5">
+          <img src={logo} alt="ZoomMeets" className="h-9 w-9 drop-shadow-sm" />
           <span className="text-[15px] font-semibold tracking-tight text-foreground">ZoomMeets</span>
           <span className="ml-auto rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-medium text-success">
             Live
@@ -216,7 +213,7 @@ export function AppShell() {
         </div> */}
 
         {/* Operations */}
-        <div className="px-4">
+        <div className="px-4 pt-5">
           <p className="mb-2 px-2 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
             Operations
           </p>
@@ -240,20 +237,26 @@ export function AppShell() {
         </div>
 
         {/* Bottom section */}
-        <div className="space-y-3 border-t border-border px-4 py-4">
-          {/* Subscription renewal — prominent, positive framing */}
+        <div className="space-y-2.5 border-t border-white/70 bg-white/20 px-4 py-4 backdrop-blur-xl">
+          {/* Subscription renewal */}
           <div
             className={cn(
-              'rounded-xl border p-3',
+              'group relative overflow-hidden rounded-2xl border p-3.5 shadow-[0_14px_32px_-24px_rgba(30,64,175,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-22px_rgba(30,64,175,0.5)]',
               renewal.expired || renewal.isUrgent
-                ? 'border-destructive/20 bg-destructive/10'
-                : 'border-success/20 bg-success/10'
+                ? 'border-destructive/20 bg-gradient-to-br from-destructive/12 to-white/55'
+                : 'border-success/20 bg-gradient-to-br from-success/12 to-white/60'
             )}
           >
+            <div
+              className={cn(
+                'pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full blur-2xl transition-opacity duration-300 group-hover:opacity-90',
+                renewal.expired || renewal.isUrgent ? 'bg-destructive/25' : 'bg-success/25'
+              )}
+            />
             <div className="flex items-start gap-2.5">
               <div
                 className={cn(
-                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg',
+                  'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/70 shadow-sm',
                   renewal.expired || renewal.isUrgent ? 'bg-destructive/15' : 'bg-success/15'
                 )}
               >
@@ -261,10 +264,13 @@ export function AppShell() {
                   className={cn('h-4 w-4', renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success')}
                 />
               </div>
-              <div className="min-w-0">
+              <div className="relative min-w-0 flex-1">
+                <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
+                  Workspace plan
+                </p>
                 <p
                   className={cn(
-                    'text-xs font-semibold',
+                    'text-xs font-bold',
                     renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success'
                   )}
                 >
@@ -276,16 +282,27 @@ export function AppShell() {
                     : `Next renewal on ${renewal.formatted}`}
                 </p>
               </div>
+              <span
+                className={cn(
+                  'relative mt-1 h-2 w-2 shrink-0 rounded-full shadow-[0_0_0_4px_rgba(255,255,255,0.55)]',
+                  renewal.expired || renewal.isUrgent ? 'bg-destructive' : 'bg-success'
+                )}
+              />
             </div>
           </div>
 
           {/* Profile */}
-          <div className="flex w-full items-center gap-3 rounded-xl px-2 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-chart-1/20">
-              <span className="text-sm font-medium text-chart-1">{initials(admin?.name)}</span>
+          <button
+            type="button"
+            onClick={() => navigate('/system')}
+            className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-white/70 bg-white/48 p-2.5 text-left shadow-sm backdrop-blur-xl transition-all duration-200 hover:border-chart-1/20 hover:bg-white/72 hover:shadow-md"
+          >
+            <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-chart-1/20 to-violet-300/25 ring-1 ring-white/75">
+              <span className="text-sm font-bold text-chart-1">{initials(admin?.name)}</span>
+              <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-white bg-success" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-foreground">{admin?.name}</p>
+              <p className="truncate text-sm font-bold text-foreground">{admin?.name}</p>
               <span className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                 {isSuperAdmin ? (
                   <ShieldCheck className="h-3 w-3 text-chart-1" />
@@ -295,13 +312,14 @@ export function AppShell() {
                 {isSuperAdmin ? 'Super Admin' : 'Admin'}
               </span>
             </div>
-          </div>
+            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-chart-1" />
+          </button>
         </div>
       </aside>
 
       {/* Main Content */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-card px-8">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/70 bg-card/58 px-8 shadow-[0_10px_32px_-28px_rgba(30,64,175,0.4)] backdrop-blur-2xl">
           <div>
             <h1 className="text-lg font-semibold tracking-tight text-foreground">{heading.title}</h1>
             {heading.subtitle && <p className="text-sm text-muted-foreground">{heading.subtitle}</p>}
@@ -337,15 +355,6 @@ export function AppShell() {
             )}
             <button
               type="button"
-              onClick={() => queryClient.invalidateQueries()}
-              className="rounded-xl p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Refresh"
-              title="Refresh"
-            >
-              <RefreshCw className="h-[18px] w-[18px]" />
-            </button>
-            <button
-              type="button"
               onClick={() => toast.info('No new notifications')}
               className="relative rounded-xl p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               aria-label="Notifications"
@@ -365,6 +374,8 @@ export function AppShell() {
           </div>
         </header>
         <div className="relative flex-1 overflow-hidden">
+          <div className="pointer-events-none absolute left-[8%] top-[5%] h-72 w-72 rounded-full bg-blue-300/15 blur-3xl" />
+          <div className="pointer-events-none absolute bottom-[4%] right-[10%] h-80 w-80 rounded-full bg-violet-300/15 blur-3xl" />
           {meetingLive && (
             <MeetingPortalHost mode={isDashboard ? 'visible' : 'background'} />
           )}

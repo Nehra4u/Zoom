@@ -236,150 +236,142 @@ export function SystemPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardContent className="flex flex-col gap-5 pt-6 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-chart-1/15">
-              <span className="text-xl font-semibold text-chart-1">{initials(admin?.name)}</span>
+    <div className="space-y-5">
+      <Card className="gap-0 py-0">
+        <CardContent className="flex flex-col gap-5 px-6 py-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-chart-1/12 ring-1 ring-chart-1/15">
+              <span className="text-xl font-bold text-chart-1">{initials(admin?.name)}</span>
+              <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white bg-success" />
             </div>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h2 className="truncate text-lg font-semibold text-foreground">{admin?.name}</h2>
-                <Badge variant={isSuperAdmin ? 'success' : 'secondary'} className="gap-1">
+                <h2 className="truncate text-xl font-semibold text-foreground">{admin?.name}</h2>
+                <Badge variant={isSuperAdmin ? 'success' : 'secondary'} className="gap-1 rounded-full">
                   {isSuperAdmin ? <ShieldCheck className="h-3 w-3" /> : <Shield className="h-3 w-3" />}
                   {isSuperAdmin ? 'Super Admin' : 'Admin'}
                 </Badge>
               </div>
               <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Mail className="h-3.5 w-3.5" />
-                {admin?.email}
+                <span className="truncate">{admin?.email}</span>
               </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Last login: {formatDateTime(admin?.lastLoginAt ?? null)}
               </p>
             </div>
           </div>
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setEditOpen(true)}>
-              <Pencil className="h-4 w-4" />
-              Edit Profile
-            </Button>
-            <Button variant="outline" onClick={() => setPasswordOpen(true)}>
-              <KeyRound className="h-4 w-4" />
-              Change Password
-            </Button>
-          </div>
+          <Button variant="outline" onClick={() => setEditOpen(true)}>
+            <Pencil className="h-4 w-4" />
+            Edit profile
+          </Button>
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+      <div className="grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+        <Card className="gap-4">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserIcon className="h-5 w-5" />
-              Account details
+            <CardTitle className="flex items-center gap-2 text-base">
+              <UserIcon className="h-4.5 w-4.5 text-chart-1" />
+              Profile information
             </CardTitle>
-            <CardDescription>Your admin account information</CardDescription>
+            <CardDescription>Your administrator account details</CardDescription>
           </CardHeader>
           <CardContent>
-            <dl className="space-y-3 text-sm">
-              <div className="flex items-center justify-between gap-4">
-                <dt className="flex items-center gap-1.5 text-muted-foreground">
-                  <UserIcon className="h-3.5 w-3.5" />
-                  Full name
-                </dt>
-                <dd className="truncate font-medium text-foreground">{admin?.name}</dd>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <dt className="flex items-center gap-1.5 text-muted-foreground">
-                  <Mail className="h-3.5 w-3.5" />
-                  Email
-                </dt>
-                <dd className="truncate font-medium text-foreground">{admin?.email}</dd>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <dt className="flex items-center gap-1.5 text-muted-foreground">
-                  <Phone className="h-3.5 w-3.5" />
-                  Mobile number
-                </dt>
-                <dd className="font-medium text-muted-foreground">Not set</dd>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-4">
-                <dt className="flex items-center gap-1.5 text-muted-foreground">
-                  <Smartphone className="h-3.5 w-3.5" />
-                  Role
-                </dt>
-                <dd className="font-medium text-foreground">{isSuperAdmin ? 'Super Admin' : 'Admin'}</dd>
-              </div>
+            <dl className="divide-y divide-border/70 text-sm">
+              {[
+                { icon: UserIcon, label: 'Full name', value: admin?.name ?? '—' },
+                { icon: Mail, label: 'Email address', value: admin?.email ?? '—' },
+                { icon: Phone, label: 'Mobile number', value: 'Not set', muted: true },
+                { icon: Smartphone, label: 'Account role', value: isSuperAdmin ? 'Super Admin' : 'Admin' },
+              ].map(({ icon: Icon, label, value, muted }) => (
+                <div key={label} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[10rem_1fr] sm:items-center">
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    <Icon className="h-3.5 w-3.5" />
+                    {label}
+                  </dt>
+                  <dd className={cn('truncate font-medium sm:text-right', muted ? 'text-muted-foreground' : 'text-foreground')}>
+                    {value}
+                  </dd>
+                </div>
+              ))}
             </dl>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarCheck2 className="h-5 w-5" />
-              Subscription
-            </CardTitle>
-            <CardDescription>Plan renewal status</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div
-              className={cn(
-                'rounded-xl border p-4',
-                renewal.expired || renewal.isUrgent
-                  ? 'border-destructive/20 bg-destructive/10'
-                  : 'border-success/20 bg-success/10'
-              )}
-            >
-              <div className="flex items-start gap-3">
-                <div
+        <div className="space-y-5">
+          <Card className="gap-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CalendarCheck2 className="h-4.5 w-4.5 text-success" />
+                Subscription
+              </CardTitle>
+              <CardDescription>Your workspace plan status</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div
+                className={cn(
+                  'flex items-start gap-3 rounded-xl border p-4',
+                  renewal.expired || renewal.isUrgent
+                    ? 'border-destructive/20 bg-destructive/7'
+                    : 'border-success/20 bg-success/7'
+                )}
+              >
+                <span
                   className={cn(
-                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                    renewal.expired || renewal.isUrgent ? 'bg-destructive/15' : 'bg-success/15'
+                    'mt-1 h-2.5 w-2.5 shrink-0 rounded-full',
+                    renewal.expired || renewal.isUrgent ? 'bg-destructive' : 'bg-success'
                   )}
-                >
-                  <CalendarCheck2
-                    className={cn('h-5 w-5', renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success')}
-                  />
-                </div>
+                />
                 <div>
-                  <p
-                    className={cn(
-                      'text-sm font-semibold',
-                      renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success'
-                    )}
-                  >
-                    {renewal.headline}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {renewal.expired
-                      ? 'Contact Administration to reactivate'
-                      : `Next renewal on ${renewal.formatted}`}
+                  <p className="text-sm font-semibold text-foreground">{renewal.headline}</p>
+                  <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {renewal.expired ? 'Contact Administration to reactivate' : `Next renewal on ${renewal.formatted}`}
                   </p>
                 </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            </CardContent>
+          </Card>
 
-      <Card>
-        <CardContent className="flex items-center justify-between gap-4 pt-6">
-          <div>
-            <p className="text-sm font-medium text-foreground">Log out</p>
-            <p className="text-xs text-muted-foreground">End your session on this device.</p>
-          </div>
-          <Button variant="destructive" onClick={handleLogout} disabled={loggingOut}>
-            <LogOut className="h-4 w-4" />
-            {loggingOut ? 'Logging out…' : 'Log out'}
-          </Button>
-        </CardContent>
-      </Card>
+          <Card className="gap-4">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ShieldCheck className="h-4.5 w-4.5 text-chart-1" />
+                Account security
+              </CardTitle>
+              <CardDescription>Password and session controls</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <KeyRound className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Password</p>
+                    <p className="text-xs text-muted-foreground">Keep your account protected</p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => setPasswordOpen(true)}>
+                  Change
+                </Button>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span className="h-2 w-2 rounded-full bg-success" />
+                    Current session
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">Signed in on this device</p>
+                </div>
+                <Button variant="destructive" size="sm" onClick={handleLogout} disabled={loggingOut}>
+                  <LogOut className="h-4 w-4" />
+                  {loggingOut ? 'Logging out…' : 'Log out'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       <EditProfileDialog
         open={editOpen}

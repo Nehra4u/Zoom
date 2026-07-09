@@ -1,7 +1,3 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
-import { endMeeting } from '@/api/session'
-import { getErrorMessage } from '@/api/client'
 import { MeetingJoinPanel } from '@/components/MeetingJoinPanel'
 import { useSessionStore } from '@/stores/sessionStore'
 import { cn } from '@/lib/utils'
@@ -11,17 +7,7 @@ interface MeetingPortalHostProps {
 }
 
 export function MeetingPortalHost({ mode }: MeetingPortalHostProps) {
-  const queryClient = useQueryClient()
-  const { meetingLive, canEndMeeting } = useSessionStore()
-
-  const endMutation = useMutation({
-    mutationFn: endMeeting,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
-      toast.success('Meeting ended — recording will appear in Recordings when ready')
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  })
+  const meetingLive = useSessionStore((state) => state.meetingLive)
 
   if (!meetingLive) return null
 
@@ -39,12 +25,7 @@ export function MeetingPortalHost({ mode }: MeetingPortalHostProps) {
           mode === 'background' && 'h-full w-full'
         )}
       >
-        <MeetingJoinPanel
-          meetingLive={meetingLive}
-          mode={mode}
-          endPending={endMutation.isPending}
-          onEndMeeting={canEndMeeting ? () => endMutation.mutate() : undefined}
-        />
+        <MeetingJoinPanel meetingLive={meetingLive} mode={mode} />
       </div>
     </div>
   )

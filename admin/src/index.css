@@ -4,43 +4,42 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Ported 1:1 from the Pulse (v0.app) reference UI */
-  --background: oklch(0.965 0.003 250);
-  --foreground: oklch(0.2 0.015 250);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.2 0.015 250);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.2 0.015 250);
-  --primary: oklch(0.25 0.015 250);
+  --background: oklch(0.965 0.018 250);
+  --foreground: oklch(0.27 0.045 257);
+  --card: oklch(1 0 0 / 0.78);
+  --card-foreground: oklch(0.27 0.045 257);
+  --popover: oklch(1 0 0 / 0.92);
+  --popover-foreground: oklch(0.27 0.045 257);
+  --primary: oklch(0.57 0.19 255);
   --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.97 0.003 250);
-  --secondary-foreground: oklch(0.3 0.015 250);
-  --muted: oklch(0.96 0.003 250);
-  --muted-foreground: oklch(0.55 0.01 250);
-  --accent: oklch(0.78 0.18 85);
-  --accent-foreground: oklch(0.25 0.05 85);
+  --secondary: oklch(0.94 0.03 248);
+  --secondary-foreground: oklch(0.36 0.09 255);
+  --muted: oklch(0.945 0.018 248 / 0.86);
+  --muted-foreground: oklch(0.53 0.045 255);
+  --accent: oklch(0.93 0.055 243);
+  --accent-foreground: oklch(0.4 0.14 255);
   --destructive: oklch(0.6 0.2 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --border: oklch(0.92 0.005 250);
-  --input: oklch(0.97 0.003 250);
-  --ring: oklch(0.55 0.12 250);
-  --chart-1: oklch(0.55 0.18 250);
+  --border: oklch(0.875 0.032 250 / 0.72);
+  --input: oklch(0.88 0.035 250 / 0.9);
+  --ring: oklch(0.61 0.17 255);
+  --chart-1: oklch(0.58 0.19 255);
   --chart-2: oklch(0.65 0.15 155);
   --chart-3: oklch(0.7 0.18 350);
   --chart-4: oklch(0.78 0.18 85);
   --chart-5: oklch(0.6 0.12 200);
   --radius: 0.75rem;
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.2 0.015 250);
-  --sidebar-primary: oklch(0.25 0.015 250);
+  --sidebar: oklch(1 0 0 / 0.72);
+  --sidebar-foreground: oklch(0.27 0.045 257);
+  --sidebar-primary: oklch(0.57 0.19 255);
   --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.97 0.003 250);
-  --sidebar-accent-foreground: oklch(0.2 0.015 250);
-  --sidebar-border: oklch(0.94 0.003 250);
+  --sidebar-accent: oklch(0.94 0.035 248 / 0.86);
+  --sidebar-accent-foreground: oklch(0.35 0.09 255);
+  --sidebar-border: oklch(0.89 0.025 250 / 0.7);
   --sidebar-ring: oklch(0.55 0.12 250);
 
-  --surface-elevated: oklch(1 0 0);
-  --surface-sunken: oklch(0.975 0.003 250);
+  --surface-elevated: oklch(1 0 0 / 0.84);
+  --surface-sunken: oklch(0.95 0.025 248 / 0.82);
   --success: oklch(0.6 0.17 155);
   --warning: oklch(0.78 0.18 85);
   --info: oklch(0.55 0.15 250);
@@ -100,10 +99,34 @@
 body {
   margin: 0;
   min-height: 100svh;
-  background: var(--color-background);
+  background:
+    radial-gradient(circle at 8% 10%, oklch(0.9 0.08 246 / 0.65), transparent 30rem),
+    radial-gradient(circle at 92% 88%, oklch(0.91 0.075 292 / 0.48), transparent 34rem),
+    var(--color-background);
   color: var(--color-foreground);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
+}
+
+.app-surface {
+  background:
+    radial-gradient(circle at 32% 8%, oklch(0.9 0.08 248 / 0.52), transparent 28rem),
+    radial-gradient(circle at 76% 92%, oklch(0.91 0.065 292 / 0.38), transparent 30rem),
+    linear-gradient(135deg, oklch(0.975 0.014 245), oklch(0.95 0.025 260));
+}
+
+.login-surface {
+  background:
+    radial-gradient(circle at 12% 18%, oklch(0.86 0.11 248 / 0.72), transparent 32rem),
+    radial-gradient(circle at 88% 82%, oklch(0.88 0.08 295 / 0.62), transparent 34rem),
+    linear-gradient(145deg, oklch(0.98 0.01 245), oklch(0.94 0.03 255));
+}
+
+.glass-card {
+  border: 1px solid oklch(1 0 0 / 0.74);
+  background: linear-gradient(145deg, oklch(1 0 0 / 0.76), oklch(0.97 0.025 250 / 0.58));
+  box-shadow: 0 24px 50px -34px oklch(0.38 0.12 255 / 0.42);
+  backdrop-filter: blur(22px);
 }
 
 #root {
@@ -175,7 +198,7 @@ body {
     opacity: 0.45;
   }
   100% {
-    transform: scale(2.6);
+    transform: scale(1.62);
     opacity: 0;
   }
 }
@@ -202,4 +225,15 @@ body {
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 30px -12px oklch(0.3 0.02 60 / 0.15);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

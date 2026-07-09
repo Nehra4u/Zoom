@@ -43,9 +43,9 @@ export function RightPanel() {
   const activeUsers = useMemo(() => (usersQuery.data ?? []).filter((u) => u.isOnline), [usersQuery.data])
 
   return (
-    <aside className="flex h-screen w-[240px] shrink-0 flex-col overflow-hidden border-l border-border bg-card">
+    <aside className="flex h-screen w-[240px] shrink-0 flex-col overflow-hidden border-l border-white/70 bg-card/66 shadow-[-12px_0_40px_-34px_rgba(30,64,175,0.35)] backdrop-blur-2xl">
       {/* System Status */}
-      <div className="border-b border-border p-5">
+      <div className="border-b border-white/70 p-5">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-medium text-foreground">System Status</h3>
           <span className="flex items-center gap-1.5 text-xs font-medium text-success">
@@ -54,7 +54,7 @@ export function RightPanel() {
           </span>
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div className="rounded-xl bg-muted/50 p-3">
+          <div className="rounded-xl border border-white/70 bg-white/45 p-3 shadow-sm backdrop-blur-md">
             <p className="mb-1 whitespace-nowrap text-[9.5px] uppercase tracking-wide text-muted-foreground">
               Active Users
             </p>
@@ -62,7 +62,7 @@ export function RightPanel() {
               {usersQuery.isLoading ? '—' : activeUsers.length}
             </p>
           </div>
-          <div className="rounded-xl bg-muted/50 p-3">
+          <div className="rounded-xl border border-white/70 bg-white/45 p-3 shadow-sm backdrop-blur-md">
             <p className="mb-1 whitespace-nowrap text-[9.5px] uppercase tracking-wide text-muted-foreground">
               P95 Latency
             </p>
@@ -87,7 +87,7 @@ export function RightPanel() {
         ) : (
           <div className="space-y-2">
             {activeUsers.map((user) => (
-              <div key={user.id} className="flex items-center gap-3 rounded-lg -mx-2 p-2">
+              <div key={user.id} className="-mx-2 flex items-center gap-3 rounded-xl border border-transparent p-2 transition-colors hover:border-white/70 hover:bg-white/45">
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-chart-1/20">
                   <UserRound className="h-[18px] w-[18px] text-chart-1" />
                 </div>

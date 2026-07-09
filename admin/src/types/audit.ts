@@ -17,6 +17,9 @@ export type AuditAction =
   | 'recording_removed'
   | 'recording_expired'
   | 'settings_updated'
+  | 'meeting_started'
+  | 'meeting_ended'
+  | 'participant_removed'
 
 export interface AuditLogEntry {
   id: string

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { LogOut, ShieldCheck, ShieldOff, Trash2 } from 'lucide-react'
+import { Check, LogOut, ShieldCheck, ShieldOff, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { activateUser, deactivateUser, deleteUser, logoutUser } from '@/api/users'
@@ -19,10 +19,11 @@ const ACTIONS: { key: StatusAction; label: string; description: string; icon: Lu
   { key: 'delete', label: 'Delete', description: 'Soft-delete this account permanently', icon: Trash2 },
 ]
 
-function currentActionFor(user: ApkUser): StatusAction {
+function currentActionFor(user: ApkUser): StatusAction | null {
   if (user.device?.loggedOut) return 'logout'
   if (user.status === 'inactive') return 'deactivate'
-  return 'activate'
+  if (user.status === 'active') return 'activate'
+  return null
 }
 
 interface UserStatusDialogProps {
@@ -32,10 +33,10 @@ interface UserStatusDialogProps {
 
 export function UserStatusDialog({ user, onClose }: UserStatusDialogProps) {
   const queryClient = useQueryClient()
-  const [action, setAction] = useState<StatusAction>('activate')
+  const [action, setAction] = useState<StatusAction | null>(null)
 
   useEffect(() => {
-    if (user) setAction(currentActionFor(user))
+    if (user) setAction(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
@@ -90,12 +91,13 @@ export function UserStatusDialog({ user, onClose }: UserStatusDialogProps) {
 
   function handleOpenChange(open: boolean) {
     if (!open) {
-      setAction('activate')
+      setAction(null)
       onClose()
     }
   }
 
   function handleUpdate() {
+    if (!action) return
     if (action === 'activate') activateMutation.mutate()
     else if (action === 'deactivate') deactivateMutation.mutate()
     else if (action === 'logout') logoutMutation.mutate()
@@ -112,7 +114,7 @@ export function UserStatusDialog({ user, onClose }: UserStatusDialogProps) {
               <DialogDescription>Choose an action for {user.name}, then confirm with Update.</DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               {ACTIONS.map((item) => {
                 const Icon = item.icon
                 const isSelected = action === item.key
@@ -121,43 +123,66 @@ export function UserStatusDialog({ user, onClose }: UserStatusDialogProps) {
                   <button
                     key={item.key}
                     type="button"
+                    disabled={isCurrent}
                     onClick={() => setAction(item.key)}
                     className={cn(
-                      'flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-colors',
+                      'group flex w-full items-start gap-3 rounded-xl border p-3.5 text-left transition-all duration-200',
                       isSelected
-                        ? isCurrent
-                          ? 'border-success bg-success/5'
-                          : 'border-primary bg-primary/5'
-                        : 'border-border hover:bg-muted/50'
+                        ? item.key === 'delete'
+                          ? 'border-destructive/50 bg-destructive/8 shadow-md shadow-destructive/10 ring-2 ring-destructive/15'
+                          : 'border-primary/55 bg-primary/8 shadow-md shadow-primary/10 ring-2 ring-primary/15'
+                        : isCurrent
+                          ? 'cursor-not-allowed border-border/60 bg-muted/50 opacity-60 grayscale-[0.2]'
+                          : 'cursor-pointer border-white/80 bg-white/40 hover:-translate-y-0.5 hover:border-primary/25 hover:bg-white/75 hover:shadow-sm'
                     )}
                   >
-                    <Icon
+                    <span
                       className={cn(
-                        'mt-0.5 h-4 w-4 shrink-0',
-                        isCurrent ? 'text-success' : item.key === 'delete' ? 'text-destructive' : 'text-muted-foreground'
+                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors',
+                        isSelected
+                          ? item.key === 'delete'
+                            ? 'bg-destructive text-white'
+                            : 'bg-primary text-primary-foreground'
+                          : isCurrent
+                            ? 'bg-muted text-muted-foreground'
+                            : item.key === 'delete'
+                              ? 'bg-destructive/10 text-destructive'
+                              : 'bg-chart-1/10 text-chart-1'
                       )}
-                    />
+                    >
+                      <Icon className="h-4 w-4" />
+                    </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span
                           className={cn(
                             'block text-sm',
-                            isCurrent
-                              ? 'font-bold text-success'
-                              : item.key === 'delete'
-                                ? 'font-medium text-destructive'
-                                : 'font-medium text-foreground'
+                            item.key === 'delete'
+                              ? 'font-medium text-destructive'
+                              : 'font-semibold text-foreground'
                           )}
                         >
                           {item.label}
                         </span>
                         {isCurrent && (
-                          <span className="text-[10px] font-bold uppercase tracking-wide text-success">
-                            Current
+                          <span className="rounded-full bg-muted-foreground/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-muted-foreground">
+                            Current status
                           </span>
                         )}
                       </span>
                       <span className="block text-xs text-muted-foreground">{item.description}</span>
+                    </span>
+                    <span
+                      className={cn(
+                        'mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all',
+                        isSelected
+                          ? item.key === 'delete'
+                            ? 'border-destructive bg-destructive text-white'
+                            : 'border-primary bg-primary text-primary-foreground'
+                          : 'border-border/80 bg-white/50 text-transparent'
+                      )}
+                    >
+                      <Check className="h-3 w-3" />
                     </span>
                   </button>
                 )
@@ -171,10 +196,10 @@ export function UserStatusDialog({ user, onClose }: UserStatusDialogProps) {
               <Button
                 type="button"
                 variant={action === 'delete' ? 'destructive' : 'default'}
-                disabled={isPending}
+                disabled={isPending || action === null}
                 onClick={handleUpdate}
               >
-                {isPending ? 'Updating…' : 'Update'}
+                {isPending ? 'Updating…' : action ? 'Apply update' : 'Select an update'}
               </Button>
             </div>
           </>
