@@ -8,6 +8,7 @@ import {
   getStoredSessionId,
   TOKEN_REFRESH_EVENT,
 } from '@/api/client'
+import { API_BASE_URL } from '@/config'
 import { useSessionStore } from '@/stores/sessionStore'
 import type { ActiveMeeting, SessionParticipant } from '@/types/session'
 
@@ -49,7 +50,7 @@ export function useAdminSocket(enabled = true) {
   useEffect(() => {
     if (!enabled || !accessToken) return
 
-    const socket = io('/admin', {
+    const socket = io(API_BASE_URL ? `${API_BASE_URL}/admin` : '/admin', {
       auth: { token: accessToken },
       transports: ['websocket', 'polling'],
       reconnection: true,

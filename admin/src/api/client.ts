@@ -1,4 +1,5 @@
 import axios, { type AxiosError, type InternalAxiosRequestConfig } from 'axios'
+import { API_PREFIX } from '@/config'
 
 const ACCESS_KEY = 'zc_access_token'
 const REFRESH_KEY = 'zc_refresh_token'
@@ -45,7 +46,7 @@ export function setStoredAdmin<T>(admin: T) {
 }
 
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_PREFIX,
   headers: { 'Content-Type': 'application/json' },
 })
 
@@ -81,7 +82,7 @@ api.interceptors.response.use(
           const refreshToken = getStoredRefreshToken()
           if (!refreshToken) return null
           try {
-            const { data } = await axios.post('/api/auth/admin/refresh', { refreshToken })
+            const { data } = await axios.post(`${API_PREFIX}/auth/admin/refresh`, { refreshToken })
             setStoredTokens(data.accessToken, data.refreshToken)
             setStoredAdmin(data.admin)
             window.dispatchEvent(new CustomEvent(TOKEN_REFRESH_EVENT))
