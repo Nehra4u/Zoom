@@ -10,7 +10,6 @@ import {
   LayoutDashboard,
   RefreshCw,
   Rocket,
-  Search,
   Settings,
   Shield,
   ShieldCheck,
@@ -203,7 +202,7 @@ export function AppShell() {
         </div>
 
         {/* Search */}
-        <div className="px-4 py-4">
+        {/* <div className="px-4 py-4">
           <button
             type="button"
             className="flex w-full items-center gap-3 rounded-xl bg-muted/60 px-3.5 py-2.5 transition-colors hover:bg-muted"
@@ -214,7 +213,7 @@ export function AppShell() {
               /
             </kbd>
           </button>
-        </div>
+        </div> */}
 
         {/* Operations */}
         <div className="px-4">

@@ -1,6 +1,7 @@
 import { Server } from 'socket.io';
 import { User } from '../models/User.js';
 import { DeviceSession } from '../models/DeviceSession.js';
+import { getSocketCorsOrigin } from '../config/cors.js';
 import { setIo, getIo } from '../services/io.js';
 import { notifyUserPresence, sendStatusSync } from '../services/notificationService.js';
 import { authenticateAdminSocket, authenticateClientSocket } from './middleware.js';
@@ -21,7 +22,7 @@ export function getOnlineUserIds() {
 export function setupSocket(httpServer) {
   const io = new Server(httpServer, {
     cors: {
-      origin: process.env.ADMIN_PORTAL_URL || 'http://localhost:5173',
+      origin: getSocketCorsOrigin(),
       credentials: true,
     },
   });

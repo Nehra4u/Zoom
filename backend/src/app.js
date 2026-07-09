@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import { rateLimit } from 'express-rate-limit';
 import { createServer } from 'http';
 import { connectDb } from './config/db.js';
+import { corsOriginDelegate } from './config/cors.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admins.js';
 import userRoutes from './routes/users.js';
@@ -29,7 +30,7 @@ app.use(helmet());
 
 app.use(
   cors({
-    origin: process.env.ADMIN_PORTAL_URL || 'http://localhost:5173',
+    origin: corsOriginDelegate,
     credentials: true,
   })
 );

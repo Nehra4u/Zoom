@@ -25,6 +25,9 @@ export function LoginPage() {
     if (searchParams.get('subscription') === 'expired') {
       toast.error('Your subscription has ended. Please contact Administration for reactivating.')
     }
+    if (searchParams.get('session') === 'expired') {
+      toast.error('Your session expired. Please sign in again.')
+    }
   }, [searchParams])
 
   if (isAuthenticated) {
