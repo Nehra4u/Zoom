@@ -59,6 +59,39 @@ function encodeMeetingUuid(uuid) {
   return encodeURIComponent(uuid);
 }
 
+export function normalizeMeetingNumber(meetingNumber) {
+  const digits = String(meetingNumber ?? '').replace(/\D/g, '');
+  if (!digits) {
+    const err = new Error('Invalid meeting number');
+    err.status = 400;
+    throw err;
+  }
+  return digits;
+}
+
+export async function verifyMeetingExists(meetingNumber) {
+  if (isMockMode()) {
+    return { id: normalizeMeetingNumber(meetingNumber), mock: true };
+  }
+
+  const normalized = normalizeMeetingNumber(meetingNumber);
+  const token = await getZoomAccessToken();
+  const response = await fetch(`https://api.zoom.us/v2/meetings/${normalized}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (response.status === 404) {
+    return null;
+  }
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Zoom verify meeting failed: ${response.status} ${text}`);
+  }
+
+  return response.json();
+}
+
 export async function createInstantMeeting({ topic = 'ZoomControl Session', hostUserId = null } = {}) {
   if (isMockMode()) {
     throw new Error('createInstantMeeting called in mock mode');
@@ -90,11 +123,12 @@ export async function createInstantMeeting({ topic = 'ZoomControl Session', host
   }
 
   const data = await response.json();
+  const meetingNumber = normalizeMeetingNumber(data.id);
   return {
-    meetingNumber: String(data.id),
+    meetingNumber,
     password: data.password ?? '',
     zoomMeetingUuid: data.uuid,
-    zoomMeetingId: String(data.id),
+    zoomMeetingId: meetingNumber,
     topic: data.topic,
     startUrl: data.start_url ?? null,
     joinUrl: data.join_url ?? null,

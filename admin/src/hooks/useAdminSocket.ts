@@ -17,8 +17,8 @@ import type { ApkUser } from '@/types/user'
 function handleSessionRevoked() {
   clearStoredTokens()
   useSessionStore.getState().reset()
-  toast.error('Logged in from another device')
-  window.location.href = '/login'
+  toast.error('Logged in from another device or tab')
+  window.location.href = '/login?session=superseded'
 }
 
 function shouldLogoutOnRevoke(activeSessionId?: string) {
@@ -34,7 +34,7 @@ function handleSubscriptionExpired() {
   window.location.href = '/login'
 }
 
-export function useAdminSocket(enabled = true) {
+export function useAdminSocket(enabled = true, isSuperAdmin = false) {
   const socketRef = useRef<Socket | null>(null)
   const queryClient = useQueryClient()
   const accessToken = getStoredAccessToken()
@@ -133,6 +133,7 @@ export function useAdminSocket(enabled = true) {
     })
 
     socket.on('recording:available', (payload: { topic?: string }) => {
+      if (isSuperAdmin) return
       queryClient.invalidateQueries({ queryKey: ['recordings'] })
       toast.success(
         payload.topic
@@ -167,6 +168,7 @@ export function useAdminSocket(enabled = true) {
   }, [
     enabled,
     accessToken,
+    isSuperAdmin,
     upsertParticipant,
     removeParticipant,
     updateMute,

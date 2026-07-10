@@ -4,12 +4,12 @@ import { fetchCurrentSession } from '@/api/session'
 import { useSessionStore } from '@/stores/sessionStore'
 
 export function useSessionSync() {
-  const { socketConnected, setSnapshot } = useSessionStore()
+  const { socketConnected, meetingLive, setSnapshot } = useSessionStore()
 
   const sessionQuery = useQuery({
     queryKey: ['session', 'current'],
     queryFn: fetchCurrentSession,
-    refetchInterval: socketConnected ? false : 30_000,
+    refetchInterval: socketConnected ? false : meetingLive ? 10_000 : 30_000,
   })
 
   useEffect(() => {

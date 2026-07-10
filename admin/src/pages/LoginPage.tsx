@@ -30,6 +30,9 @@ export function LoginPage() {
     if (searchParams.get('session') === 'expired') {
       toast.error('Your session expired. Please sign in again.')
     }
+    if (searchParams.get('session') === 'superseded') {
+      toast.error('Logged in from another device or tab. Please sign in again.')
+    }
   }, [searchParams])
 
   if (isAuthenticated) {

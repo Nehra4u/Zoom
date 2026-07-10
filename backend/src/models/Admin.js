@@ -14,6 +14,8 @@ const adminSchema = new mongoose.Schema(
     deletedAt: { type: Date, default: null },
     /** Zoom user ID on your Business account — each admin should have their own for parallel meetings */
     zoomHostUserId: { type: String, default: null, trim: true },
+    /** Active portal session — only one device/tab at a time */
+    activeSessionId: { type: String, default: null },
   },
   { timestamps: true }
 );

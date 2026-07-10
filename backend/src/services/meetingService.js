@@ -7,7 +7,9 @@ import { writeAuditLog } from './auditService.js';
 import {
   assertAdminOwnsUser,
   assertCanManageMeeting,
+  assertRegularAdmin,
   canManageMeeting,
+  isSuperAdmin,
   userScopeQuery,
 } from './adminScope.js';
 import {
@@ -17,6 +19,8 @@ import {
   removeLiveParticipant,
   isMockMode,
   fetchHostZakToken,
+  verifyMeetingExists,
+  normalizeMeetingNumber,
 } from './zoomApi.js';
 import {
   forceLeaveUser,
@@ -60,7 +64,7 @@ export async function getLiveMeetingForAdmin(adminId) {
 
 /** Live meeting this admin owns or can access via shared Zoom host account. */
 export async function getAccessibleLiveMeeting(actor) {
-  if (!actor?.sub) return null;
+  if (!actor?.sub || isSuperAdmin(actor)) return null;
 
   const own = await getLiveMeetingForAdmin(actor.sub);
   if (own) {
@@ -143,6 +147,7 @@ async function resolveHostUserId(adminId) {
 }
 
 export async function startMeeting(actor) {
+  assertRegularAdmin(actor);
   const existing = await getLiveMeetingForAdmin(actor.sub);
   if (existing) {
     const err = new Error('You already have a live meeting');
@@ -171,7 +176,7 @@ export async function startMeeting(actor) {
 
   let meetingData;
   if (isMockMode()) {
-    const id = crypto.randomUUID().replace(/-/g, '').slice(0, 10);
+    const id = String(Date.now()).padStart(10, '0').slice(-10);
     meetingData = {
       meetingNumber: id,
       password: 'mock-pass',
@@ -183,10 +188,13 @@ export async function startMeeting(actor) {
     };
   } else {
     meetingData = await createInstantMeeting({ topic, hostUserId });
+    if (!isMockMode()) {
+      await verifyMeetingExists(meetingData.meetingNumber);
+    }
   }
 
   const meeting = await ActiveMeeting.create({
-    meetingNumber: meetingData.meetingNumber,
+    meetingNumber: normalizeMeetingNumber(meetingData.meetingNumber),
     password: meetingData.password ?? '',
     zoomMeetingUuid: meetingData.zoomMeetingUuid,
     zoomMeetingId: meetingData.zoomMeetingId ?? meetingData.meetingNumber,
@@ -221,6 +229,7 @@ export async function startMeeting(actor) {
 }
 
 export async function endMeeting(actor) {
+  assertRegularAdmin(actor);
   const accessible = await getAccessibleLiveMeeting(actor);
   if (!accessible?.canEnd) {
     const err = new Error('No live meeting to end');
@@ -259,6 +268,7 @@ export async function endMeeting(actor) {
 }
 
 export async function getMeetingJoinInfo(actor) {
+  assertRegularAdmin(actor);
   const accessible = await getAccessibleLiveMeeting(actor);
   if (!accessible) {
     const err = new Error('No live meeting');
@@ -278,6 +288,7 @@ export async function getMeetingJoinInfo(actor) {
 }
 
 export async function issueAdminJoinToken(actor) {
+  assertRegularAdmin(actor);
   const accessible = await getAccessibleLiveMeeting(actor);
   if (!accessible) {
     const err = new Error('No live meeting');
@@ -287,32 +298,76 @@ export async function issueAdminJoinToken(actor) {
   const live = accessible.meeting;
   await assertCanAccessMeeting(actor, live);
 
+  if (!isMockMode()) {
+    const zoomMeeting = await verifyMeetingExists(live.meetingNumber);
+    if (!zoomMeeting) {
+      live.status = 'ended';
+      live.endedAt = new Date();
+      await live.save();
+      const { handleSessionEnded } = await import('./sessionService.js');
+      await handleSessionEnded(live.meetingNumber);
+      const err = new Error('Meeting no longer exists on Zoom');
+      err.status = 404;
+      err.code = 'MEETING_ENDED';
+      throw err;
+    }
+  }
+
+  const meetingNumber = normalizeMeetingNumber(live.meetingNumber);
   const displayName = await getAdminDisplayName(actor.sub);
   const admin = await Admin.findById(actor.sub);
+  const isMeetingHost = live.startedBy?.toString() === actor.sub;
 
-  // Role 1 + ZAK starts the meeting as host; userName keeps the admin's display name in Zoom.
-  const { token: sdkJwt } = generateZoomSdkJwt(live.meetingNumber, 1);
-  const zak = await fetchHostZakToken(live.hostUserId);
+  let role = 0;
+  let zak = null;
+  let joinMode = 'attendee';
+  let sdkJwt;
+
+  if (isMeetingHost) {
+    try {
+      const fetchedZak = await fetchHostZakToken(live.hostUserId);
+      if (!fetchedZak || typeof fetchedZak !== 'string' || !fetchedZak.length) {
+        const err = new Error(
+          'Unable to fetch Zoom host token. Check Zoom API credentials and host user ID.'
+        );
+        err.status = 503;
+        throw err;
+      }
+      zak = fetchedZak;
+      role = 1;
+      joinMode = 'host';
+    } catch (zakErr) {
+      const err = new Error(
+        `Unable to fetch Zoom host token: ${zakErr.message}. Check Zoom API credentials and host user ID.`
+      );
+      err.status = 503;
+      throw err;
+    }
+  }
+
+  ({ token: sdkJwt } = generateZoomSdkJwt(meetingNumber, role));
 
   await writeAuditLog({
     actor,
     action: 'admin_join_token_issued',
-    meta: { meetingNumber: live.meetingNumber, displayName },
+    meta: { meetingNumber, displayName, role, joinMode, zakUsed: Boolean(zak) },
   });
 
   return {
     sdkJwt,
     zak,
-    meetingNumber: live.meetingNumber,
+    meetingNumber,
     password: live.password ?? '',
     sdkKey: process.env.ZOOM_SDK_KEY ?? null,
-    role: 1,
+    role,
+    joinMode,
     displayName,
     userEmail: admin?.email ?? actor.email ?? null,
   };
 }
 
 export async function removeParticipantFromCall(userId, actor) {
+  assertRegularAdmin(actor);
   await assertAdminOwnsUser(actor, userId);
 
   const accessible = await getAccessibleLiveMeeting(actor);
@@ -351,6 +406,7 @@ export async function removeParticipantFromCall(userId, actor) {
 }
 
 export async function setParticipantMuted(userId, muted, actor) {
+  assertRegularAdmin(actor);
   await assertAdminOwnsUser(actor, userId);
 
   const accessible = await getAccessibleLiveMeeting(actor);

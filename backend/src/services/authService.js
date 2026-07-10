@@ -53,7 +53,6 @@ export async function loginAdmin(email, password) {
   }
 
   admin.lastLoginAt = new Date();
-  await admin.save();
 
   await AdminRefreshToken.updateMany(
     { adminId: admin._id, revokedAt: null },
@@ -61,6 +60,9 @@ export async function loginAdmin(email, password) {
   );
 
   const { token: accessToken, sessionId } = signAdminAccessToken(admin);
+  admin.activeSessionId = sessionId;
+  await admin.save();
+
   notifyAdminSessionRevoked(admin._id.toString(), sessionId);
 
   const refresh = signAdminRefreshToken(admin._id);
@@ -96,10 +98,17 @@ export async function refreshAdminToken(refreshToken) {
     throw err;
   }
 
+  if (!admin.activeSessionId) {
+    const err = new Error('Session superseded');
+    err.status = 401;
+    err.code = 'SESSION_SUPERSEDED';
+    throw err;
+  }
+
   stored.revokedAt = new Date();
   await stored.save();
 
-  const { token: accessToken } = signAdminAccessToken(admin);
+  const { token: accessToken, sessionId } = signAdminAccessToken(admin, admin.activeSessionId);
   const refresh = signAdminRefreshToken(admin._id);
   await AdminRefreshToken.create({
     adminId: admin._id,
@@ -111,13 +120,27 @@ export async function refreshAdminToken(refreshToken) {
     accessToken,
     refreshToken: refresh.token,
     admin: toPublicAdmin(admin),
+    sessionId,
   };
 }
 
 export async function logoutAdmin(refreshToken, accessToken) {
+  let adminId = null;
+
   if (refreshToken) {
     const tokenHash = hashToken(refreshToken);
+    const stored = await AdminRefreshToken.findOne({ tokenHash });
+    if (stored) adminId = stored.adminId;
     await AdminRefreshToken.updateOne({ tokenHash, revokedAt: null }, { revokedAt: new Date() });
+  }
+
+  if (!adminId && accessToken) {
+    const payload = decodeTokenUnsafe(accessToken);
+    if (payload?.sub) adminId = payload.sub;
+  }
+
+  if (adminId) {
+    await Admin.updateOne({ _id: adminId }, { activeSessionId: null });
   }
 
   if (accessToken) {
@@ -185,6 +208,21 @@ export async function changeCurrentAdminPassword(adminId, currentPassword, newPa
   await admin.save();
 
   return { ok: true };
+}
+
+export async function assertAdminSessionActive(adminId, sessionId) {
+  const admin = await Admin.findById(adminId).select('activeSessionId status').lean();
+  if (!admin || admin.status !== 'active') {
+    const err = new Error('Account inactive');
+    err.status = 403;
+    throw err;
+  }
+  if (!admin.activeSessionId || admin.activeSessionId !== sessionId) {
+    const err = new Error('Session superseded');
+    err.status = 401;
+    err.code = 'SESSION_SUPERSEDED';
+    throw err;
+  }
 }
 
 export { verifyAdminAccessToken };

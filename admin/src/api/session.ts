@@ -8,6 +8,7 @@ export interface AdminJoinCredentials {
   password: string
   sdkKey: string | null
   role: number
+  joinMode?: 'host' | 'attendee'
   displayName: string
   userEmail: string | null
 }

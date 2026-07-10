@@ -9,6 +9,7 @@ import {
 } from 'react'
 import {
   AUTH_SESSION_EXPIRED_EVENT,
+  broadcastAuthLogin,
   clearStoredTokens,
   getStoredAccessToken,
   getStoredAdmin,
@@ -70,6 +71,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStoredAdmin(result.admin)
     if (result.sessionId) {
       setStoredSessionId(result.sessionId)
+      broadcastAuthLogin(
+        result.accessToken,
+        result.refreshToken,
+        result.admin,
+        result.sessionId
+      )
     }
     setAdmin(result.admin)
     return result.admin

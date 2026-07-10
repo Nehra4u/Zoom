@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { ProtectedRoute } from '@/auth/ProtectedRoute'
 import { RequireSuperAdmin } from '@/auth/RequireSuperAdmin'
+import { RequireRegularAdmin } from '@/auth/RequireRegularAdmin'
 import { AppShell } from '@/layouts/AppShell'
 import { LoginPage } from '@/pages/LoginPage'
 import { DashboardPage } from '@/pages/DashboardPage'
@@ -29,11 +30,13 @@ export function AppRoutes() {
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
             <Route index element={<HomeRedirect />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="users" element={<UserListPage />} />
-            <Route path="users/new" element={<UserCreatePage />} />
-            <Route path="users/:id" element={<UserDetailPage />} />
-            <Route path="recordings" element={<RecordingListPage />} />
+            <Route element={<RequireRegularAdmin />}>
+              <Route path="dashboard" element={<DashboardPage />} />
+              <Route path="users" element={<UserListPage />} />
+              <Route path="users/new" element={<UserCreatePage />} />
+              <Route path="users/:id" element={<UserDetailPage />} />
+              <Route path="recordings" element={<RecordingListPage />} />
+            </Route>
             <Route path="audit-logs" element={<AuditLogPage />} />
             <Route path="system" element={<SystemPage />} />
             <Route path="app-info" element={<AppDetailsPage />} />

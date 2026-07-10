@@ -1,24 +1,35 @@
 import { User } from '../models/User.js';
 
+export function isSuperAdmin(admin) {
+  return admin?.role === 'super_admin';
+}
+
+export function assertRegularAdmin(admin) {
+  if (isSuperAdmin(admin)) {
+    const err = new Error('Super admins cannot perform meeting, user, or recording operations');
+    err.status = 403;
+    err.code = 'SUPER_ADMIN_RESTRICTED';
+    throw err;
+  }
+}
+
 export function userScopeQuery(admin) {
-  if (!admin || admin.role === 'super_admin') return {};
+  if (!admin) return {};
   return { createdBy: admin.sub };
 }
 
 export function recordingScopeQuery(admin) {
-  if (!admin || admin.role === 'super_admin') return {};
+  if (!admin) return {};
   return { startedBy: admin.sub };
 }
 
 export function ownsUser(admin, user) {
-  if (!user) return false;
-  if (admin.role === 'super_admin') return true;
+  if (!user || !admin) return false;
   return user.createdBy?.toString() === admin.sub;
 }
 
 export function canManageMeeting(admin, meeting) {
-  if (!meeting) return false;
-  if (admin.role === 'super_admin') return true;
+  if (!meeting || !admin) return false;
   return meeting.startedBy?.toString() === admin.sub;
 }
 

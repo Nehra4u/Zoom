@@ -32,13 +32,97 @@
     <script>
       const statusEl = document.getElementById('status')
       const SDK_VERSION = '6.2.0'
+      let sdkReady = false
+      let joinInFlight = false
+      let sdkInitialized = false
 
       function setStatus(text) {
         statusEl.textContent = text
       }
 
       function notifyError(message) {
-        window.parent.postMessage({ type: 'ZOOM_ERROR', message }, window.location.origin)
+        joinInFlight = false
+        window.parent.postMessage(
+          { type: 'ZOOM_ERROR', message: formatZoomError(message) },
+          window.location.origin
+        )
+      }
+
+      function extractZoomError(err) {
+        if (!err) return 'Join failed'
+        if (typeof err === 'string') return err
+
+        if (typeof err.errorMessage === 'string' && err.errorMessage.length > 0) {
+          return err.errorMessage
+        }
+        if (typeof err.result === 'string' && err.result.length > 0) {
+          return err.result
+        }
+
+        var reason = err.reason
+        if (typeof reason === 'string' && reason.length > 0) return reason
+
+        if (reason && typeof reason === 'object') {
+          if (typeof reason.errorMessage === 'string') return reason.errorMessage
+          if (typeof reason.message === 'string') return reason.message
+          if (typeof reason.desc === 'string') return reason.desc
+        }
+
+        if (typeof err.message === 'string' && err.message.length > 0) return err.message
+
+        if (err.errorCode === 3707 || err.errorCode === 3706) {
+          return 'The meeting number was not found. End the current session and start a new meeting.'
+        }
+        if (err.errorCode != null) {
+          return 'Zoom error ' + err.errorCode
+        }
+        if (err.type != null) {
+          return 'Zoom error: ' + err.type
+        }
+        if (err.result != null && typeof err.result !== 'string') {
+          try {
+            return JSON.stringify(err.result)
+          } catch (_e) {
+            /* fall through */
+          }
+        }
+
+        try {
+          return JSON.stringify(err)
+        } catch (_e) {
+          return 'Join failed'
+        }
+      }
+
+      function formatZoomError(raw) {
+        var text = typeof raw === 'string' ? raw : extractZoomError(raw)
+        var lower = text.toLowerCase()
+        if (lower.includes('meeting number is not found') || lower.includes('meeting number was not found') || lower.includes('meeting number is wrong')) {
+          return 'The meeting number was not found. End the current session and start a new meeting.'
+        }
+        if (lower.includes('zoom error 3707') || lower.includes('zoom error 3706')) {
+          return 'The meeting number was not found. End the current session and start a new meeting.'
+        }
+        if (lower.includes('token error') || lower.includes('zak')) {
+          return 'Zoom host token is invalid or expired. Check Zoom credentials on the server.'
+        }
+        if (lower.includes('invalid signature') || lower.includes('signature is invalid')) {
+          return 'Zoom SDK signature is invalid. Verify ZOOM_SDK_KEY and ZOOM_SDK_SECRET.'
+        }
+        if (lower.includes('expired')) {
+          return 'Zoom join token expired. Refresh the page and try again.'
+        }
+        if (
+          lower.includes('timeout') ||
+          lower.includes('browser restriction') ||
+          lower.includes('network')
+        ) {
+          return 'Network or browser blocked Zoom. Allow camera/microphone access and check firewall settings.'
+        }
+        if (lower.includes('browser') && lower.includes('not supported')) {
+          return 'This browser is not supported for in-portal Zoom meetings. Try Chrome or Edge.'
+        }
+        return text
       }
 
       // Client View bundle expects React/Redux globals — load vendors first (see Zoom CDN sample).
@@ -47,6 +131,7 @@
         '/zoom/vendor/react-dom.min.js',
         '/zoom/vendor/redux.min.js',
         '/zoom/vendor/redux-thunk.min.js',
+        '/zoom/vendor/react-redux.min.js',
         '/zoom/vendor/lodash.min.js',
       ]
 
@@ -73,46 +158,70 @@
         }, Promise.resolve())
       }
 
+      function normalizeMeetingNumber(value) {
+        return String(value || '').replace(/\D/g, '')
+      }
+
       function joinMeeting(credentials, leaveUrl) {
+        if (joinInFlight) return
         if (typeof ZoomMtg === 'undefined') {
           notifyError('Zoom SDK failed to load')
           return
         }
 
-        ZoomMtg.setZoomJSLib('https://source.zoom.us/' + SDK_VERSION + '/lib', '/av')
-        ZoomMtg.preLoadWasm()
-        ZoomMtg.prepareWebSDK()
+        joinInFlight = true
+
+        if (!sdkInitialized) {
+          ZoomMtg.setZoomJSLib('https://source.zoom.us/' + SDK_VERSION + '/lib', '/av')
+          ZoomMtg.preLoadWasm()
+          ZoomMtg.prepareWebSDK()
+        }
+
+        function doJoin() {
+          setStatus('Joining meeting…')
+
+          var meetingNumber = normalizeMeetingNumber(credentials.meetingNumber)
+          if (!meetingNumber) {
+            notifyError('Invalid meeting number')
+            return
+          }
+
+          var joinParams = {
+            signature: credentials.sdkJwt,
+            meetingNumber: meetingNumber,
+            passWord: credentials.password || '',
+            userName: credentials.displayName || 'Admin',
+            userEmail: credentials.userEmail || '',
+            success: function () {
+              joinInFlight = false
+              statusEl.style.display = 'none'
+              window.parent.postMessage({ type: 'ZOOM_JOINED' }, window.location.origin)
+            },
+            error: function (err) {
+              notifyError(extractZoomError(err))
+            },
+          }
+          if (credentials.zak) {
+            joinParams.zak = credentials.zak
+          }
+          ZoomMtg.join(joinParams)
+        }
+
+        if (sdkInitialized) {
+          doJoin()
+          return
+        }
 
         ZoomMtg.init({
           leaveUrl: leaveUrl,
           patchJsMedia: true,
           disableCORP: !window.crossOriginIsolated,
           success: function () {
-            setStatus('Joining meeting…')
-            // Intentional leave is handled via leaveUrl → zoom-leave.html (posts ZOOM_LEFT).
-            // Do not treat meetingStatus 3 (transient disconnect / tab background) as leave.
-
-            var joinParams = {
-              signature: credentials.sdkJwt,
-              meetingNumber: credentials.meetingNumber,
-              passWord: credentials.password || '',
-              userName: credentials.displayName || 'Admin',
-              userEmail: credentials.userEmail || '',
-              success: function () {
-                statusEl.style.display = 'none'
-                window.parent.postMessage({ type: 'ZOOM_JOINED' }, window.location.origin)
-              },
-              error: function (err) {
-                notifyError(String(err?.reason || err?.message || err || 'Join failed'))
-              },
-            }
-            if (credentials.zak) {
-              joinParams.zak = credentials.zak
-            }
-            ZoomMtg.join(joinParams)
+            sdkInitialized = true
+            doJoin()
           },
           error: function (err) {
-            notifyError(String(err?.reason || err?.message || err || 'Init failed'))
+            notifyError(extractZoomError(err))
           },
         })
       }
@@ -120,6 +229,7 @@
       window.addEventListener('message', function (event) {
         if (event.origin !== window.location.origin) return
         if (!event.data || event.data.type !== 'ZOOM_JOIN') return
+        if (!sdkReady) return
         joinMeeting(event.data.credentials, event.data.leaveUrl)
       })
 
@@ -131,6 +241,7 @@
           if (typeof ZoomMtg === 'undefined') {
             throw new Error('Zoom SDK loaded but ZoomMtg is unavailable')
           }
+          sdkReady = true
           setStatus('Waiting to join…')
           window.parent.postMessage({ type: 'ZOOM_READY' }, window.location.origin)
         })

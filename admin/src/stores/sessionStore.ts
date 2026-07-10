@@ -10,6 +10,8 @@ interface SessionStore {
   canEndMeeting: boolean
   portalJoined: boolean
   portalJoinAttempted: boolean
+  portalJoinFailed: boolean
+  portalJoinError: string | null
   socketConnected: boolean
   setSnapshot: (snapshot: {
     participants: SessionParticipant[]
@@ -23,6 +25,7 @@ interface SessionStore {
   applyLiveMeeting: (meeting: ActiveMeeting, opts?: { canEndMeeting?: boolean; meetingOwnedByMe?: boolean }) => void
   setPortalJoined: (joined: boolean) => void
   setPortalJoinAttempted: (attempted: boolean) => void
+  setPortalJoinFailed: (failed: boolean, error?: string | null) => void
   setSocketConnected: (connected: boolean) => void
   upsertParticipant: (participant: SessionParticipant) => void
   removeParticipant: (userId: string) => void
@@ -40,6 +43,8 @@ export const useSessionStore = create<SessionStore>((set) => ({
   canEndMeeting: false,
   portalJoined: false,
   portalJoinAttempted: false,
+  portalJoinFailed: false,
+  portalJoinError: null,
   socketConnected: false,
 
   setSnapshot: ({ participants, sessionActive, meetingLive, meeting, meetingOwnedByMe, canEndMeeting }) =>
@@ -52,7 +57,14 @@ export const useSessionStore = create<SessionStore>((set) => ({
         meeting: meeting ?? null,
         meetingOwnedByMe: meetingOwnedByMe ?? false,
         canEndMeeting: canEndMeeting ?? false,
-        ...(live === false ? { portalJoined: false, portalJoinAttempted: false } : {}),
+        ...(live === false
+          ? {
+              portalJoined: false,
+              portalJoinAttempted: false,
+              portalJoinFailed: false,
+              portalJoinError: null,
+            }
+          : {}),
       }
     }),
 
@@ -77,6 +89,9 @@ export const useSessionStore = create<SessionStore>((set) => ({
   setPortalJoined: (portalJoined) => set({ portalJoined }),
 
   setPortalJoinAttempted: (portalJoinAttempted) => set({ portalJoinAttempted }),
+
+  setPortalJoinFailed: (portalJoinFailed, error = null) =>
+    set({ portalJoinFailed, portalJoinError: error }),
 
   setSocketConnected: (socketConnected) => set({ socketConnected }),
 
@@ -113,6 +128,8 @@ export const useSessionStore = create<SessionStore>((set) => ({
       canEndMeeting: false,
       portalJoined: false,
       portalJoinAttempted: false,
+      portalJoinFailed: false,
+      portalJoinError: null,
     }),
 
   reset: () =>
@@ -125,6 +142,8 @@ export const useSessionStore = create<SessionStore>((set) => ({
       canEndMeeting: false,
       portalJoined: false,
       portalJoinAttempted: false,
+      portalJoinFailed: false,
+      portalJoinError: null,
       socketConnected: false,
     }),
 }))

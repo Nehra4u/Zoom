@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, adminOnly } from '../middleware/authenticate.js';
+import { authenticate, adminOnly, regularAdminOnly } from '../middleware/authenticate.js';
 import {
   getCurrentSession,
   handleParticipantJoined,
@@ -18,7 +18,7 @@ import {
 
 const router = Router();
 
-router.use(authenticate, adminOnly);
+router.use(authenticate, adminOnly, regularAdminOnly);
 
 router.get('/current', async (req, res) => {
   try {
@@ -43,7 +43,9 @@ router.post('/join-token', async (req, res) => {
     const credentials = await issueAdminJoinToken(req.admin);
     res.json(credentials);
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message });
+    const body = { error: err.message };
+    if (err.code) body.code = err.code;
+    res.status(err.status || 500).json(body);
   }
 });
 

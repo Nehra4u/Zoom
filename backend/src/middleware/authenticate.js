@@ -1,6 +1,7 @@
 import { verifyAdminAccessToken, verifyClientAccessToken } from '../services/tokenService.js';
 import { RevokedToken } from '../models/RevokedToken.js';
 import { assertSubscriptionActive } from '../services/settingsService.js';
+import { assertAdminSessionActive } from '../services/authService.js';
 
 async function isRevoked(jti) {
   if (!jti) return false;
@@ -24,6 +25,7 @@ export async function authenticate(req, res, next) {
     }
     try {
       await assertSubscriptionActive();
+      await assertAdminSessionActive(payload.sub, payload.sid);
     } catch (err) {
       return res.status(err.status || 403).json({ error: err.message, code: err.code });
     }
@@ -44,6 +46,16 @@ export function adminOnly(req, res, next) {
 export function superAdminOnly(req, res, next) {
   if (!req.admin || req.admin.role !== 'super_admin') {
     return res.status(403).json({ error: 'Super admin access required' });
+  }
+  next();
+}
+
+export function regularAdminOnly(req, res, next) {
+  if (!req.admin || req.admin.role === 'super_admin') {
+    return res.status(403).json({
+      error: 'Super admins cannot perform this operation',
+      code: 'SUPER_ADMIN_RESTRICTED',
+    });
   }
   next();
 }

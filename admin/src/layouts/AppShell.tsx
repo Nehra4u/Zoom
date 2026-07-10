@@ -22,7 +22,9 @@ import { useAuth } from '@/auth/AuthContext'
 import { useAdminSocket } from '@/hooks/useAdminSocket'
 import { useSessionSync } from '@/hooks/useSessionSync'
 import { MeetingActiveBanner } from '@/components/MeetingActiveBanner'
+import { EndMeetingButton } from '@/components/EndMeetingButton'
 import { MeetingPortalHost } from '@/components/MeetingPortalHost'
+import { TabSessionBlocker } from '@/components/TabSessionBlocker'
 import { RightPanel } from '@/layouts/RightPanel'
 import { useSessionStore } from '@/stores/sessionStore'
 import { fetchSubscription } from '@/api/settings'
@@ -33,20 +35,27 @@ interface NavItem {
   label: string
   icon: LucideIcon
   superAdminOnly?: boolean
+  adminOnly?: boolean
 }
 
 const OPERATIONS_ITEMS: NavItem[] = [
-  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/users', label: 'User Management', icon: Users },
+  { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: true },
+  { to: '/users', label: 'User Management', icon: Users, adminOnly: true },
   { to: '/audit-logs', label: 'Admin Logs', icon: ClipboardList },
   { to: '/admins', label: 'Admin Details', icon: Shield, superAdminOnly: true },
   { to: '/app-info', label: 'App Details', icon: Rocket },
 ]
 
 const RECORDS_ITEMS: NavItem[] = [
-  { to: '/recordings', label: 'Recording', icon: Film },
+  { to: '/recordings', label: 'Recording', icon: Film, adminOnly: true },
   { to: '/system', label: 'Settings', icon: Settings },
 ]
+
+function isNavItemVisible(item: NavItem, isSuperAdmin: boolean) {
+  if (item.superAdminOnly && !isSuperAdmin) return false
+  if (item.adminOnly && isSuperAdmin) return false
+  return true
+}
 
 function formatSubscriptionRenewal(endDate: string | null, isActive: boolean) {
   if (!endDate) {
@@ -154,11 +163,11 @@ function NavButton({ item, meetingLive }: { item: NavItem; meetingLive?: boolean
 }
 
 export function AppShell() {
-  const { admin, isSuperAdmin } = useAuth()
+  const { admin, isSuperAdmin, isAuthenticated } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const { meetingLive, socketConnected } = useSessionStore()
-  useAdminSocket(true)
+  const { meetingLive, socketConnected, canEndMeeting } = useSessionStore()
+  useAdminSocket(true, isSuperAdmin)
   useSessionSync()
 
   const subscriptionQuery = useQuery({
@@ -168,9 +177,11 @@ export function AppShell() {
   })
 
   const isDashboard = location.pathname.startsWith('/dashboard')
-  const showPortalBackground = meetingLive && !isDashboard
+  const showMeetingUi = !isSuperAdmin && meetingLive
+  const showPortalBackground = showMeetingUi && !isDashboard
 
-  const navItems = OPERATIONS_ITEMS.filter((item) => !item.superAdminOnly || isSuperAdmin)
+  const navItems = OPERATIONS_ITEMS.filter((item) => isNavItemVisible(item, isSuperAdmin))
+  const recordsItems = RECORDS_ITEMS.filter((item) => isNavItemVisible(item, isSuperAdmin))
   const heading = useMemo(
     () => getPageHeading(location.pathname, isSuperAdmin),
     [location.pathname, isSuperAdmin]
@@ -187,6 +198,7 @@ export function AppShell() {
 
   return (
     <div className="app-surface flex h-screen overflow-hidden">
+      <TabSessionBlocker enabled={isAuthenticated} />
       {/* Left Sidebar */}
       <aside className="flex h-screen w-[260px] shrink-0 flex-col border-r border-white/70 bg-card/70 shadow-[12px_0_40px_-34px_rgba(30,64,175,0.35)] backdrop-blur-2xl">
         {/* Logo */}
@@ -230,7 +242,7 @@ export function AppShell() {
             Records
           </p>
           <nav className="space-y-0.5">
-            {RECORDS_ITEMS.map((item) => (
+            {recordsItems.map((item) => (
               <NavButton key={item.to} item={item} />
             ))}
           </nav>
@@ -333,7 +345,7 @@ export function AppShell() {
                   ? 'bg-success/10 text-success'
                   : 'bg-muted text-muted-foreground'
               )}
-              title={socketConnected ? 'Realtime connected' : 'Realtime disconnected — polling every 30s'}
+              title={socketConnected ? 'Realtime connected' : meetingLive ? 'Realtime disconnected — polling every 10s' : 'Realtime disconnected — polling every 30s'}
             >
               <span
                 className={cn(
@@ -343,7 +355,7 @@ export function AppShell() {
               />
               {socketConnected ? 'Live' : 'Offline'}
             </span>
-            {meetingLive && !isDashboard && (
+            {showMeetingUi && !isDashboard && (
               <button
                 type="button"
                 onClick={() => navigate('/dashboard')}
@@ -352,6 +364,9 @@ export function AppShell() {
                 <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
                 Meeting live
               </button>
+            )}
+            {showMeetingUi && canEndMeeting && (
+              <EndMeetingButton variant="outline" size="sm" />
             )}
             <button
               type="button"
@@ -376,13 +391,13 @@ export function AppShell() {
         <div className="relative flex-1 overflow-hidden">
           <div className="pointer-events-none absolute left-[8%] top-[5%] h-72 w-72 rounded-full bg-blue-300/15 blur-3xl" />
           <div className="pointer-events-none absolute bottom-[4%] right-[10%] h-80 w-80 rounded-full bg-violet-300/15 blur-3xl" />
-          {meetingLive && (
-            <MeetingPortalHost mode={isDashboard ? 'visible' : 'background'} />
+          {showMeetingUi && (
+            <MeetingPortalHost mode={isDashboard ? 'visible' : 'mini'} />
           )}
           <div
             className={cn(
               'h-full overflow-y-auto p-6',
-              meetingLive && isDashboard && 'invisible'
+              showMeetingUi && isDashboard && 'invisible'
             )}
           >
             <Outlet />

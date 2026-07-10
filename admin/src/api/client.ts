@@ -123,10 +123,32 @@ export function handleSessionExpired(reason = 'expired') {
   }
 }
 
-function applyTokenUpdate(accessToken: string, refreshToken: string, admin?: Admin) {
+function applyTokenUpdate(
+  accessToken: string,
+  refreshToken: string,
+  admin?: Admin,
+  sessionId?: string
+) {
   setStoredTokens(accessToken, refreshToken)
   if (admin) setStoredAdmin(admin)
+  if (sessionId) setStoredSessionId(sessionId)
   window.dispatchEvent(new CustomEvent(TOKEN_REFRESH_EVENT, { detail: admin }))
+}
+
+export function broadcastAuthLogin(
+  accessToken: string,
+  refreshToken: string,
+  admin: Admin,
+  sessionId: string
+) {
+  localStorage.removeItem('zc_active_tab')
+  broadcastAuthMessage({
+    type: 'tokens-updated',
+    accessToken,
+    refreshToken,
+    admin,
+    sessionId,
+  })
 }
 
 export async function refreshAccessToken(): Promise<string | null> {
@@ -146,14 +168,16 @@ export async function refreshAccessToken(): Promise<string | null> {
         accessToken: string
         refreshToken: string
         admin: Admin
+        sessionId?: string
       }>(`${API_PREFIX}/auth/admin/refresh`, { refreshToken })
 
-      applyTokenUpdate(data.accessToken, data.refreshToken, data.admin)
+      applyTokenUpdate(data.accessToken, data.refreshToken, data.admin, data.sessionId)
       broadcastAuthMessage({
         type: 'tokens-updated',
         accessToken: data.accessToken,
         refreshToken: data.refreshToken,
         admin: data.admin,
+        sessionId: data.sessionId,
       })
       return data.accessToken
     } catch {
@@ -174,13 +198,14 @@ export function initAuthSync() {
 
   const onMessage = (event: MessageEvent) => {
     if (event.data?.type === 'tokens-updated') {
-      const { accessToken, refreshToken, admin } = event.data as {
+      const { accessToken, refreshToken, admin, sessionId } = event.data as {
         accessToken: string
         refreshToken: string
         admin?: Admin
+        sessionId?: string
       }
       if (accessToken && refreshToken) {
-        applyTokenUpdate(accessToken, refreshToken, admin)
+        applyTokenUpdate(accessToken, refreshToken, admin, sessionId)
       }
     } else if (event.data?.type === 'session-expired') {
       clearStoredTokens()
@@ -213,6 +238,11 @@ api.interceptors.response.use(
       error.response.data?.code === 'SUBSCRIPTION_EXPIRED'
     ) {
       handleSessionExpired('subscription')
+      return Promise.reject(error)
+    }
+
+    if (error.response?.status === 401 && error.response.data?.code === 'SESSION_SUPERSEDED') {
+      handleSessionExpired('superseded')
       return Promise.reject(error)
     }
 

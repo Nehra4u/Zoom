@@ -1,7 +1,7 @@
 import { Recording } from '../models/Recording.js';
 import { fetchMeetingRecordings, fetchUserRecordings, deleteCloudRecordingFile } from './zoomApi.js';
 import { writeAuditLog } from './auditService.js';
-import { recordingScopeQuery } from './adminScope.js';
+import { recordingScopeQuery, assertRegularAdmin } from './adminScope.js';
 import {
   getRetentionCutoffDate,
   getRecordingRetentionDays,
@@ -58,6 +58,7 @@ export async function upsertRecordingFile({ zoomMeetingId, topic, duration, file
 }
 
 export async function syncRecordingsFromZoom(admin) {
+  assertRegularAdmin(admin);
   const hostUserId = await resolveHostUserId(admin.sub);
   const from = daysAgoIso(30);
   const to = todayIso();
@@ -75,9 +76,7 @@ export async function syncRecordingsFromZoom(admin) {
       const relatedMeeting = await findMeetingByZoomId(meetingId);
       const startedBy = relatedMeeting?.startedBy ?? null;
 
-      if (admin.role !== 'super_admin') {
-        if (!relatedMeeting || startedBy?.toString() !== admin.sub) continue;
-      }
+      if (!relatedMeeting || startedBy?.toString() !== admin.sub) continue;
 
       for (const file of meeting.recording_files ?? []) {
         if (cutoff && file.recording_start && new Date(file.recording_start) < cutoff) continue;
@@ -112,6 +111,7 @@ function todayIso() {
 }
 
 export async function listRecordings(admin = null) {
+  assertRegularAdmin(admin);
   await enforceRecordingRetention();
   const cutoff = await getRetentionCutoffDate();
   const retentionDays = await getRecordingRetentionDays();
@@ -124,6 +124,7 @@ export async function listRecordings(admin = null) {
 }
 
 export async function getRecordingById(id, admin = null) {
+  assertRegularAdmin(admin);
   const query = { _id: id, ...recordingScopeQuery(admin) };
   const recording = await Recording.findOne(query);
   if (!recording) return null;
@@ -132,6 +133,7 @@ export async function getRecordingById(id, admin = null) {
 }
 
 export async function getFreshPlayUrl(id, actor) {
+  assertRegularAdmin(actor);
   const recording = await getRecordingById(id, actor);
   if (!recording) {
     const err = new Error('Recording not found or access denied');
@@ -169,6 +171,7 @@ export async function getFreshPlayUrl(id, actor) {
 }
 
 export async function deleteRecording(id, actor) {
+  assertRegularAdmin(actor);
   const query = { _id: id, ...recordingScopeQuery(actor) };
   const doc = await Recording.findOne(query);
   if (!doc) {

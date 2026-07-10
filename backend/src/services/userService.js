@@ -12,7 +12,7 @@ import {
 } from './notificationService.js';
 import { handleParticipantLeft } from './sessionService.js';
 import { revokeOutstandingUserToken } from './zoomTokenService.js';
-import { getUserForAdmin, userScopeQuery } from './adminScope.js';
+import { getUserForAdmin, userScopeQuery, assertRegularAdmin } from './adminScope.js';
 import { getOnlineUserIds } from '../socket/index.js';
 
 // Maximum number of APK user accounts that can exist at once (excludes deleted accounts).
@@ -87,6 +87,7 @@ export async function getUserById(id, admin = null) {
 }
 
 export async function createUser({ name, email, phone, password, zoomDisplayName, status, createdBy }) {
+  assertRegularAdmin(createdBy);
   const existing = await User.findOne({ email: email.toLowerCase() });
   if (existing) {
     const err = new Error('Email already in use');
@@ -123,6 +124,7 @@ export async function createUser({ name, email, phone, password, zoomDisplayName
 }
 
 export async function updateUser(id, updates, actor) {
+  assertRegularAdmin(actor);
   const user = await getUserForAdmin(actor, id);
   if (!user) {
     const err = new Error('User not found or access denied');
@@ -165,6 +167,7 @@ export async function updateUser(id, updates, actor) {
 }
 
 export async function activateUser(id, actor) {
+  assertRegularAdmin(actor);
   const user = await getUserForAdmin(actor, id);
   if (!user) {
     const err = new Error('User not found or access denied');
@@ -187,6 +190,7 @@ export async function activateUser(id, actor) {
 }
 
 export async function deactivateUser(id, actor) {
+  assertRegularAdmin(actor);
   const user = await getUserForAdmin(actor, id);
   if (!user) {
     const err = new Error('User not found or access denied');
@@ -230,6 +234,7 @@ export async function deactivateUser(id, actor) {
 // Additive: force-logs-out a user's devices without changing their account status
 // (distinct from deactivate, which also disables the account).
 export async function logoutUserDevices(id, actor) {
+  assertRegularAdmin(actor);
   const user = await getUserForAdmin(actor, id);
   if (!user) {
     const err = new Error('User not found or access denied');
@@ -266,6 +271,7 @@ export async function logoutUserDevices(id, actor) {
 }
 
 export async function deleteUser(id, actor) {
+  assertRegularAdmin(actor);
   const user = await getUserForAdmin(actor, id);
   if (!user) {
     const err = new Error('User not found or access denied');

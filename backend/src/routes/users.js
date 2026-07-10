@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate, adminOnly } from '../middleware/authenticate.js';
+import { authenticate, adminOnly, regularAdminOnly } from '../middleware/authenticate.js';
 import {
   activateUser,
   createUser,
@@ -13,7 +13,7 @@ import {
 
 const router = Router();
 
-router.use(authenticate, adminOnly);
+router.use(authenticate, adminOnly, regularAdminOnly);
 
 router.get('/', async (req, res) => {
   try {

@@ -20,7 +20,9 @@ router.post('/zoom', authenticateClient, async (req, res) => {
     const credentials = await issueZoomCredentialsForUser(user);
     res.json(credentials);
   } catch (err) {
-    res.status(err.status || 500).json({ error: err.message });
+    const body = { error: err.message };
+    if (err.code) body.code = err.code;
+    res.status(err.status || 500).json(body);
   }
 });
 

@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { RevokedToken } from '../models/RevokedToken.js';
 import { User } from '../models/User.js';
-import { getMeetingCredentials } from './zoomApi.js';
+import { normalizeMeetingNumber, verifyMeetingExists, isMockMode } from './zoomApi.js';
 import { writeAuditLog } from './auditService.js';
 
 /** Zoom requires exp/tokenExp at least 1800s after iat; sample uses 2h. */
@@ -31,15 +31,18 @@ export function generateZoomSdkJwt(meetingNumber, role = 0) {
   const exp = iat + SDK_TTL_SEC;
   const jti = crypto.randomUUID();
 
+  const mn = normalizeMeetingNumber(meetingNumber);
+
   const payload = {
     appKey: sdkKey,
     sdkKey,
-    mn: meetingNumber,
+    mn,
     role,
     iat,
     exp,
     tokenExp: exp,
     jti,
+    video_webrtc_mode: 1,
   };
 
   const token = jwt.sign(payload, sdkSecret);
@@ -84,8 +87,23 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
     const liveMeeting = await getLiveMeetingForAdmin(doc?.createdBy?.toString());
     if (!liveMeeting) {
       const err = new Error('No live meeting — wait for admin to start a session');
-      err.status = 503;
+      err.status = 404;
+      err.code = 'MEETING_ENDED';
       throw err;
+    }
+    if (!isMockMode()) {
+      const zoomMeeting = await verifyMeetingExists(liveMeeting.meetingNumber);
+      if (!zoomMeeting) {
+        liveMeeting.status = 'ended';
+        liveMeeting.endedAt = new Date();
+        await liveMeeting.save();
+        const { handleSessionEnded } = await import('./sessionService.js');
+        await handleSessionEnded(liveMeeting.meetingNumber);
+        const err = new Error('Meeting no longer exists on Zoom');
+        err.status = 404;
+        err.code = 'MEETING_ENDED';
+        throw err;
+      }
     }
     meetingNumber = liveMeeting.meetingNumber;
     password = liveMeeting.password ?? '';
@@ -112,7 +130,7 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
 
   return {
     sdkJwt,
-    meetingNumber: meetingNumber || '0000000000',
+    meetingNumber: normalizeMeetingNumber(meetingNumber || '0000000000'),
     password: password || '',
     jti,
   };
