@@ -9,7 +9,7 @@ export function useSessionSync() {
   const sessionQuery = useQuery({
     queryKey: ['session', 'current'],
     queryFn: fetchCurrentSession,
-    refetchInterval: socketConnected ? false : meetingLive ? 10_000 : 30_000,
+    refetchInterval: meetingLive ? 10_000 : socketConnected ? false : 30_000,
   })
 
   useEffect(() => {

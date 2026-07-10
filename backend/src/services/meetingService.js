@@ -19,8 +19,9 @@ import {
   removeLiveParticipant,
   isMockMode,
   fetchHostZakToken,
-  verifyMeetingExists,
+  fetchLiveMeetingParticipants,
   normalizeMeetingNumber,
+  verifyMeetingExists,
 } from './zoomApi.js';
 import {
   forceLeaveUser,
@@ -144,6 +145,52 @@ async function getAdminDisplayName(adminId) {
 async function resolveHostUserId(adminId) {
   const admin = await Admin.findById(adminId);
   return admin?.zoomHostUserId || process.env.ZOOM_HOST_USER_ID || null;
+}
+
+const SYNC_GRACE_MS = parseInt(process.env.MEETING_SYNC_GRACE_MS ?? '120000', 10);
+
+async function isAbsentFromZoomMetrics(liveMeeting) {
+  const ids = [
+    ...new Set(
+      [liveMeeting.zoomMeetingUuid, liveMeeting.meetingNumber, liveMeeting.zoomMeetingId]
+        .filter(Boolean)
+        .map(String)
+    ),
+  ];
+  if (!ids.length) return false;
+
+  for (const id of ids) {
+    const { notLive } = await fetchLiveMeetingParticipants(id);
+    if (!notLive) return false;
+  }
+  return true;
+}
+
+export async function syncMeetingEndIfStale(liveMeeting) {
+  if (!liveMeeting || isMockMode()) return false;
+
+  const startedAt = liveMeeting.startedAt?.getTime() ?? 0;
+  if (Date.now() - startedAt < SYNC_GRACE_MS) return false;
+
+  if (!(await isAbsentFromZoomMetrics(liveMeeting))) return false;
+
+  // Metrics 404 for all identifiers — instant meetings may not appear in metrics
+  // until someone joins, and GET /meetings can outlive the live session.
+  const exists = await verifyMeetingExists(liveMeeting.meetingNumber);
+  if (exists) {
+    const hadActivity = await SessionState.exists({
+      meetingId: liveMeeting.meetingNumber,
+    });
+    if (!hadActivity) return false;
+  }
+
+  liveMeeting.status = 'ended';
+  liveMeeting.endedAt = new Date();
+  await liveMeeting.save();
+
+  const { handleSessionEnded } = await import('./sessionService.js');
+  await handleSessionEnded(liveMeeting.meetingNumber);
+  return true;
 }
 
 export async function startMeeting(actor) {

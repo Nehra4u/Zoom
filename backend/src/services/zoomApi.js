@@ -355,7 +355,7 @@ export { isMockMode };
 
 export async function fetchLiveMeetingParticipants(meetingId) {
   if (isMockMode()) {
-    return [];
+    return { participants: [], notLive: false };
   }
 
   const token = await getZoomAccessToken();
@@ -366,7 +366,7 @@ export async function fetchLiveMeetingParticipants(meetingId) {
   );
 
   if (response.status === 404) {
-    return [];
+    return { participants: [], notLive: true };
   }
 
   if (!response.ok) {
@@ -375,7 +375,12 @@ export async function fetchLiveMeetingParticipants(meetingId) {
   }
 
   const data = await response.json();
-  return data.participants ?? [];
+  return { participants: data.participants ?? [], notLive: false };
+}
+
+export async function isMeetingLiveOnZoom(meetingId) {
+  const { notLive } = await fetchLiveMeetingParticipants(meetingId);
+  return !notLive;
 }
 
 export async function fetchZoomHostUserId() {

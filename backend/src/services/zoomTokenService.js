@@ -2,7 +2,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { RevokedToken } from '../models/RevokedToken.js';
 import { User } from '../models/User.js';
-import { normalizeMeetingNumber, verifyMeetingExists, isMockMode } from './zoomApi.js';
+import { normalizeMeetingNumber, isMockMode } from './zoomApi.js';
 import { writeAuditLog } from './auditService.js';
 
 /** Zoom requires exp/tokenExp at least 1800s after iat; sample uses 2h. */
@@ -92,13 +92,9 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
       throw err;
     }
     if (!isMockMode()) {
-      const zoomMeeting = await verifyMeetingExists(liveMeeting.meetingNumber);
-      if (!zoomMeeting) {
-        liveMeeting.status = 'ended';
-        liveMeeting.endedAt = new Date();
-        await liveMeeting.save();
-        const { handleSessionEnded } = await import('./sessionService.js');
-        await handleSessionEnded(liveMeeting.meetingNumber);
+      const { syncMeetingEndIfStale } = await import('./meetingService.js');
+      const ended = await syncMeetingEndIfStale(liveMeeting);
+      if (ended) {
         const err = new Error('Meeting no longer exists on Zoom');
         err.status = 404;
         err.code = 'MEETING_ENDED';

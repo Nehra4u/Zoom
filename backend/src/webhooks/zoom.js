@@ -131,7 +131,9 @@ export async function handleZoomWebhookEvent(body) {
 
     case 'meeting.ended': {
       const meetingId = String(object?.id ?? object?.uuid ?? '');
-      if (await isMeetingEventForActiveSession(meetingId)) {
+      const matched = await isMeetingEventForActiveSession(meetingId);
+      console.log('[webhook] meeting.ended', { meetingId, matched });
+      if (matched) {
         await handleSessionEnded(meetingId);
       }
       break;

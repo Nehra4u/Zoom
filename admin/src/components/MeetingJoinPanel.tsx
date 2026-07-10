@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { toast } from 'sonner'
-import { fetchAdminJoinToken, fetchCurrentSession, type AdminJoinCredentials } from '@/api/session'
+import { fetchAdminJoinToken, fetchCurrentSession, endMeeting, type AdminJoinCredentials } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -140,15 +140,21 @@ export function MeetingJoinPanel({
         endedHandledRef.current = true
         closeFrame()
         setPortalJoinFailed(false)
-        void queryClient
-          .fetchQuery({ queryKey: ['session', 'current'], queryFn: fetchCurrentSession })
-          .then((snapshot) => {
-            if (snapshot.meetingLive) {
-              setPortalJoinAttempted(false)
-            } else {
-              clearSession()
-            }
+        void (async () => {
+          await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+          const snapshot = await queryClient.fetchQuery({
+            queryKey: ['session', 'current'],
+            queryFn: fetchCurrentSession,
           })
+          if (snapshot.meetingLive) {
+            try {
+              await endMeeting()
+            } catch {
+              // Zoom may already be ended; local sync is best-effort
+            }
+          }
+          clearSession()
+        })()
       }
     }
 
