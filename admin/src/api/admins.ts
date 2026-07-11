@@ -2,7 +2,13 @@ import { api } from './client'
 import type { Admin, AuthResponse } from '@/types/admin'
 
 export async function loginAdmin(identifier: string, password: string) {
-  const { data } = await api.post<AuthResponse>('/auth/admin/login', { identifier, password })
+  const trimmed = identifier.trim()
+  const { data } = await api.post<AuthResponse>('/auth/admin/login', {
+    identifier: trimmed,
+    // Backward compat: older backend deployments only read `email`.
+    ...(trimmed.includes('@') ? { email: trimmed } : {}),
+    password,
+  })
   return data
 }
 
