@@ -12,11 +12,10 @@ export async function fetchUser(id: string) {
 }
 
 export async function createUser(payload: {
-  name: string
-  email: string
+  username: string
   password: string
   phone?: string
-  zoomDisplayName?: string
+  email?: string
   status?: UserStatus
 }) {
   const { data } = await api.post<{ user: ApkUser }>('/users', payload)
@@ -26,7 +25,7 @@ export async function createUser(payload: {
 export async function updateUser(
   id: string,
   payload: {
-    name?: string
+    username?: string
     email?: string
     phone?: string
     zoomDisplayName?: string

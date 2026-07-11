@@ -7,7 +7,10 @@ import { getErrorMessage } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DesktopMeetingJoinCard } from '@/components/DesktopMeetingJoinCard'
 import { EndMeetingButton } from '@/components/EndMeetingButton'
+import { JoinModeBadge } from '@/components/JoinModeBadge'
+import { triggerLocalRecordingFinalize, triggerLocalRecordingStart } from '@/components/LocalRecordingDialog'
 import { useSessionStore } from '@/stores/sessionStore'
 
 interface MeetingJoinPanelProps {
@@ -48,7 +51,7 @@ function isMeetingEndedError(err: unknown) {
 
 /**
  * Zoom Meeting SDK Client View runs in an isolated iframe (React 19 incompatible with embedded SDK).
- * Joins automatically when the meeting is live so admins can manage participants while in the call.
+ * Portal mode joins automatically when the meeting is live; desktop mode shows Zoom app join details.
  */
 export function MeetingJoinPanel({
   meetingLive,
@@ -62,6 +65,7 @@ export function MeetingJoinPanel({
   const endedHandledRef = useRef(false)
   const queryClient = useQueryClient()
   const {
+    joinMode,
     portalJoined,
     portalJoinAttempted,
     portalJoinFailed,
@@ -75,6 +79,7 @@ export function MeetingJoinPanel({
   const [showFrame, setShowFrame] = useState(false)
   const [lastMeetingNumber, setLastMeetingNumber] = useState<string | null>(null)
   const isMini = mode === 'mini'
+  const isPortalMode = joinMode === 'portal'
 
   const closeFrame = useCallback(() => {
     setShowFrame(false)
@@ -88,6 +93,12 @@ export function MeetingJoinPanel({
     }
   }, [setPortalJoined])
 
+  const stopPortalCapture = useCallback(() => {
+    void import('@/lib/localRecordingCapture').then(({ cancelLocalRecordingCapture }) => {
+      cancelLocalRecordingCapture()
+    })
+  }, [])
+
   useEffect(() => {
     if (!meetingLive) {
       setPortalJoinAttempted(false)
@@ -95,6 +106,24 @@ export function MeetingJoinPanel({
       if (showFrame) closeFrame()
     }
   }, [meetingLive, showFrame, closeFrame, setPortalJoinAttempted, setPortalJoinFailed])
+
+  useEffect(() => {
+    if (isPortalMode) return
+    if (showFrame || portalJoined) {
+      stopPortalCapture()
+      closeFrame()
+      setPortalJoinAttempted(false)
+      setPortalJoinFailed(false)
+    }
+  }, [
+    isPortalMode,
+    showFrame,
+    portalJoined,
+    closeFrame,
+    stopPortalCapture,
+    setPortalJoinAttempted,
+    setPortalJoinFailed,
+  ])
 
   useEffect(() => {
     if (!showFrame) return
@@ -118,6 +147,7 @@ export function MeetingJoinPanel({
         setJoining(false)
         setPortalJoined(true)
         setPortalJoinFailed(false)
+        triggerLocalRecordingStart()
         if (!isMini) {
           toast.success('Joined meeting in portal')
         }
@@ -140,6 +170,7 @@ export function MeetingJoinPanel({
         endedHandledRef.current = true
         closeFrame()
         setPortalJoinFailed(false)
+        triggerLocalRecordingFinalize()
         void (async () => {
           await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
           const snapshot = await queryClient.fetchQuery({
@@ -166,7 +197,6 @@ export function MeetingJoinPanel({
     isMini,
     queryClient,
     clearSession,
-    setPortalJoinAttempted,
     setPortalJoined,
     setPortalJoinFailed,
   ])
@@ -244,6 +274,7 @@ export function MeetingJoinPanel({
     queryClient,
     clearSession,
     setPortalJoinFailed,
+    setPortalJoinAttempted,
   ])
 
   const retryJoin = useCallback(() => {
@@ -254,6 +285,7 @@ export function MeetingJoinPanel({
   }, [closeFrame, joinInPortal, setPortalJoinAttempted, setPortalJoinFailed])
 
   useEffect(() => {
+    if (!isPortalMode) return
     if (
       !meetingLive ||
       showFrame ||
@@ -267,6 +299,7 @@ export function MeetingJoinPanel({
     setPortalJoinAttempted(true)
     void joinInPortal()
   }, [
+    isPortalMode,
     meetingLive,
     showFrame,
     joining,
@@ -279,6 +312,38 @@ export function MeetingJoinPanel({
 
   if (!meetingLive) return null
 
+  if (!isPortalMode) {
+    if (isMini) {
+      return (
+        <div className="flex h-full items-center justify-center p-3 text-center text-[11px] leading-4 text-white/80">
+          Using Zoom desktop app. Open the dashboard for join details.
+        </div>
+      )
+    }
+
+    return (
+      <Card className="flex h-full flex-col">
+        <CardHeader>
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-2">
+              <div>
+                <CardTitle>Live meeting</CardTitle>
+                <CardDescription>
+                  Join in the Zoom desktop app and manage participants from this dashboard.
+                </CardDescription>
+              </div>
+              <JoinModeBadge />
+            </div>
+            <EndMeetingButton />
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-1 flex-col space-y-4">
+          <DesktopMeetingJoinCard />
+        </CardContent>
+      </Card>
+    )
+  }
+
   return (
     <Card
       className={cn(
@@ -290,12 +355,15 @@ export function MeetingJoinPanel({
       {!showFrame && !isMini && (
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle>In-portal meeting</CardTitle>
-              <CardDescription>
-                You join automatically when the meeting starts. Manage participants below while in the call
-                — you appear as <strong>your admin name</strong>.
-              </CardDescription>
+            <div className="space-y-2">
+              <div>
+                <CardTitle>In-portal meeting</CardTitle>
+                <CardDescription>
+                  You join automatically when the meeting starts. Manage participants below while in
+                  the call — you appear as <strong>your admin name</strong>.
+                </CardDescription>
+              </div>
+              <JoinModeBadge />
             </div>
             <EndMeetingButton />
           </div>

@@ -16,10 +16,31 @@ import { assertSubscriptionActive } from './settingsService.js';
 const MAX_FAILED = 5;
 const LOCKOUT_MINUTES = 5;
 
-export async function loginAdmin(email, password) {
+function escapeRegex(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function findAdminByIdentifier(identifier) {
+  const raw = String(identifier ?? '').trim();
+  if (!raw) return null;
+
+  if (raw.includes('@')) {
+    return Admin.findOne({ email: raw.toLowerCase(), status: { $ne: 'deleted' } });
+  }
+
+  const byPhone = await Admin.findOne({ phone: raw, status: { $ne: 'deleted' } });
+  if (byPhone) return byPhone;
+
+  return Admin.findOne({
+    name: { $regex: new RegExp(`^${escapeRegex(raw)}$`, 'i') },
+    status: { $ne: 'deleted' },
+  });
+}
+
+export async function loginAdmin(identifier, password) {
   await assertSubscriptionActive();
 
-  const admin = await Admin.findOne({ email: email.toLowerCase(), status: { $ne: 'deleted' } });
+  const admin = await findAdminByIdentifier(identifier);
   if (!admin || admin.status !== 'active') {
     const err = new Error('Invalid credentials');
     err.status = 401;
@@ -173,14 +194,19 @@ export async function updateCurrentAdminProfile(adminId, updates) {
     throw err;
   }
 
-  if (updates.email && updates.email.toLowerCase() !== admin.email) {
-    const existing = await Admin.findOne({ email: updates.email.toLowerCase() });
-    if (existing) {
-      const err = new Error('Email already in use');
-      err.status = 409;
-      throw err;
+  if (updates.email !== undefined) {
+    const nextEmail = updates.email ? String(updates.email).toLowerCase().trim() : null;
+    if (nextEmail !== (admin.email || null)) {
+      if (nextEmail) {
+        const existing = await Admin.findOne({ email: nextEmail });
+        if (existing && existing._id.toString() !== admin._id.toString()) {
+          const err = new Error('Email already in use');
+          err.status = 409;
+          throw err;
+        }
+      }
+      admin.email = nextEmail;
     }
-    admin.email = updates.email.toLowerCase();
   }
 
   if (updates.name !== undefined) admin.name = updates.name;

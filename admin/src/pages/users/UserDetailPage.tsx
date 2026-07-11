@@ -44,10 +44,9 @@ export function UserDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [deleteOpen, setDeleteOpen] = useState(false)
-  const [name, setName] = useState('')
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
-  const [zoomDisplayName, setZoomDisplayName] = useState('')
 
   const { data: user, isLoading } = useQuery({
     queryKey: ['users', id],
@@ -57,21 +56,25 @@ export function UserDetailPage() {
 
   useEffect(() => {
     if (user) {
-      setName(user.name)
-      setEmail(user.email)
+      setUsername(user.username)
+      setEmail(user.email ?? '')
       setPhone(user.phone ?? '')
-      setZoomDisplayName(user.zoomDisplayName)
     }
   }, [user])
 
   const updateMutation = useMutation({
-    mutationFn: () => updateUser(id, { name, email, phone: phone || undefined, zoomDisplayName }),
+    mutationFn: () =>
+      updateUser(id, {
+        username,
+        email: email || undefined,
+        phone: phone || undefined,
+      }),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       queryClient.invalidateQueries({ queryKey: ['users', id] })
       const phoneChanged = (phone || null) !== (user?.phone ?? null)
       toast.success(
-        phoneChanged ? 'User updated — device unlinked for new phone number' : 'User updated'
+        phoneChanged ? 'User updated — device cleared for new phone number' : 'User updated'
       )
       if (phoneChanged && updated.phone !== undefined) {
         setPhone(updated.phone ?? '')
@@ -126,7 +129,7 @@ export function UserDetailPage() {
         <Link to="/users" className="text-sm text-muted-foreground hover:text-foreground">
           ← Back to users
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{user.name}</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{user.username}</h1>
         <div className="mt-2 flex gap-2">
           <Badge variant={statusVariant(user.status)}>{statusLabel(user.status)}</Badge>
           {user.lastActiveAt && (
@@ -143,30 +146,27 @@ export function UserDetailPage() {
         <CardContent>
           <form onSubmit={handleUpdate} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="edit-name">Full name</Label>
-              <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} required />
+              <Label htmlFor="edit-username">Username</Label>
+              <Input
+                id="edit-username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoComplete="off"
+              />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="edit-email">Email (optional)</Label>
+              <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-phone">Phone</Label>
+              <Label htmlFor="edit-phone">Phone (optional)</Label>
               <Input id="edit-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
               {phone !== (user.phone ?? '') && (
                 <p className="text-xs text-muted-foreground">
-                  Changing the phone number will unlink the current device so the user can sign in from a new phone.
+                  Changing the phone number will clear device details so the user can sign in from a new phone.
                 </p>
               )}
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-zoom">Zoom display name</Label>
-              <Input
-                id="edit-zoom"
-                value={zoomDisplayName}
-                onChange={(e) => setZoomDisplayName(e.target.value)}
-                required
-              />
             </div>
             <Button type="submit" disabled={updateMutation.isPending}>
               Save changes
@@ -179,7 +179,7 @@ export function UserDetailPage() {
         <CardHeader>
           <CardTitle>Meeting access</CardTitle>
           <CardDescription>
-            Activate to allow joining. Deactivate to force-drop from any live call (WebSocket in Phase 3).
+            Activate to allow joining. Deactivate to force-drop from any live call.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
@@ -219,7 +219,7 @@ export function UserDetailPage() {
               <DialogHeader>
                 <DialogTitle>Delete user?</DialogTitle>
                 <DialogDescription>
-                  This will soft-delete {user.name}&apos;s account. They will no longer be able to log in or join
+                  This will soft-delete {user.username}&apos;s account. They will no longer be able to log in or join
                   meetings.
                 </DialogDescription>
               </DialogHeader>

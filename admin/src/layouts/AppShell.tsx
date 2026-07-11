@@ -25,6 +25,8 @@ import { MeetingActiveBanner } from '@/components/MeetingActiveBanner'
 import { EndMeetingButton } from '@/components/EndMeetingButton'
 import { MeetingPortalHost } from '@/components/MeetingPortalHost'
 import { TabSessionBlocker } from '@/components/TabSessionBlocker'
+import { LocalRecordingDialog, useLocalRecordingLifecycle } from '@/components/LocalRecordingDialog'
+import { DesktopMeetingEndedDialog } from '@/components/DesktopMeetingEndedDialog'
 import { RightPanel } from '@/layouts/RightPanel'
 import { useSessionStore } from '@/stores/sessionStore'
 import { fetchSubscription } from '@/api/settings'
@@ -168,7 +170,8 @@ export function AppShell() {
   const navigate = useNavigate()
   const { meetingLive, socketConnected, canEndMeeting } = useSessionStore()
   useAdminSocket(true, isSuperAdmin)
-  useSessionSync()
+  useSessionSync(!isSuperAdmin)
+  useLocalRecordingLifecycle()
 
   const subscriptionQuery = useQuery({
     queryKey: ['subscription'],
@@ -199,6 +202,8 @@ export function AppShell() {
   return (
     <div className="app-surface flex h-screen overflow-hidden">
       <TabSessionBlocker enabled={isAuthenticated} />
+      {!isSuperAdmin && <LocalRecordingDialog />}
+      {!isSuperAdmin && <DesktopMeetingEndedDialog />}
       {/* Left Sidebar */}
       <aside className="flex h-screen w-[260px] shrink-0 flex-col border-r border-white/70 bg-card/70 shadow-[12px_0_40px_-34px_rgba(30,64,175,0.35)] backdrop-blur-2xl">
         {/* Logo */}

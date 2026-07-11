@@ -16,5 +16,6 @@ export interface Recording {
 export interface RecordingPlayUrl {
   playUrl: string
   downloadUrl: string | null
+  passcode: string | null
   expiresNote: string
 }

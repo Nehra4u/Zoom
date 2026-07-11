@@ -13,11 +13,12 @@ const router = Router();
 
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required' });
+    const { identifier, email, phone, password } = req.body;
+    const loginId = identifier || email || phone;
+    if (!loginId || !password) {
+      return res.status(400).json({ error: 'Login identifier and password are required' });
     }
-    const result = await loginAdmin(email, password);
+    const result = await loginAdmin(loginId, password);
     res.json(result);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message, code: err.code });

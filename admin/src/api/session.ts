@@ -1,5 +1,7 @@
 import { api } from './client'
-import type { ActiveMeeting, SessionSnapshot } from '@/types/session'
+import type { ActiveMeeting, MeetingJoinInfo, SessionSnapshot } from '@/types/session'
+
+export type { MeetingJoinInfo }
 
 export interface AdminJoinCredentials {
   sdkJwt: string
@@ -11,14 +13,6 @@ export interface AdminJoinCredentials {
   joinMode?: 'host' | 'attendee'
   displayName: string
   userEmail: string | null
-}
-
-export interface MeetingJoinInfo {
-  meetingNumber: string
-  password: string
-  startUrl: string | null
-  joinUrl: string | null
-  displayName: string
 }
 
 export async function fetchCurrentSession() {

@@ -7,7 +7,8 @@ function toPublicAdmin(admin) {
   return {
     id: admin._id.toString(),
     name: admin.name,
-    email: admin.email,
+    email: admin.email ?? null,
+    phone: admin.phone ?? null,
     role: admin.role,
     status: admin.status,
     createdBy: admin.createdBy?.toString() ?? null,
@@ -33,12 +34,51 @@ export async function getAdminById(id) {
   return toPublicAdmin(admin);
 }
 
-export async function createAdmin({ name, email, password, role = 'admin', createdBy }) {
-  const existing = await Admin.findOne({ email: email.toLowerCase() });
+async function assertZoomHostUserIdAvailable(zoomHostUserId, excludeAdminId = null) {
+  const trimmed = zoomHostUserId ? String(zoomHostUserId).trim() : '';
+  if (!trimmed) return null;
+
+  const query = { zoomHostUserId: trimmed, status: { $ne: 'deleted' } };
+  if (excludeAdminId) query._id = { $ne: excludeAdminId };
+
+  const existing = await Admin.findOne(query);
   if (existing) {
-    const err = new Error('Email already in use');
+    const err = new Error('This Zoom host user is already assigned to another admin');
     err.status = 409;
     throw err;
+  }
+
+  return trimmed;
+}
+
+export async function createAdmin({
+  name,
+  email,
+  phone,
+  password,
+  role = 'admin',
+  zoomHostUserId,
+  createdBy,
+}) {
+  const normalizedEmail = email ? String(email).toLowerCase().trim() : null;
+  const normalizedPhone = phone ? String(phone).trim() : null;
+
+  if (normalizedEmail) {
+    const existing = await Admin.findOne({ email: normalizedEmail });
+    if (existing) {
+      const err = new Error('Email already in use');
+      err.status = 409;
+      throw err;
+    }
+  }
+
+  if (normalizedPhone) {
+    const existingPhone = await Admin.findOne({ phone: normalizedPhone });
+    if (existingPhone) {
+      const err = new Error('Phone number already in use');
+      err.status = 409;
+      throw err;
+    }
   }
 
   if (role === 'super_admin' && createdBy.role !== 'super_admin') {
@@ -47,12 +87,16 @@ export async function createAdmin({ name, email, password, role = 'admin', creat
     throw err;
   }
 
+  const normalizedZoomHostUserId = await assertZoomHostUserIdAvailable(zoomHostUserId);
+
   const passwordHash = await bcrypt.hash(password, 12);
   const admin = await Admin.create({
     name,
-    email: email.toLowerCase(),
+    email: normalizedEmail,
+    phone: normalizedPhone,
     passwordHash,
     role,
+    zoomHostUserId: normalizedZoomHostUserId,
     createdBy: createdBy.sub,
   });
 
@@ -80,20 +124,47 @@ export async function updateAdmin(id, updates, actor) {
     throw err;
   }
 
-  if (updates.email && updates.email.toLowerCase() !== admin.email) {
-    const existing = await Admin.findOne({ email: updates.email.toLowerCase() });
-    if (existing) {
-      const err = new Error('Email already in use');
-      err.status = 409;
-      throw err;
+  if (updates.email !== undefined) {
+    const nextEmail = updates.email ? String(updates.email).toLowerCase().trim() : null;
+    if (nextEmail !== (admin.email || null)) {
+      if (nextEmail) {
+        const existing = await Admin.findOne({ email: nextEmail });
+        if (existing && existing._id.toString() !== admin._id.toString()) {
+          const err = new Error('Email already in use');
+          err.status = 409;
+          throw err;
+        }
+      }
+      admin.email = nextEmail;
     }
-    admin.email = updates.email.toLowerCase();
+  }
+
+  if (updates.phone !== undefined) {
+    const nextPhone = updates.phone ? String(updates.phone).trim() : null;
+    if (nextPhone !== (admin.phone || null)) {
+      if (nextPhone) {
+        const existingPhone = await Admin.findOne({ phone: nextPhone });
+        if (existingPhone && existingPhone._id.toString() !== admin._id.toString()) {
+          const err = new Error('Phone number already in use');
+          err.status = 409;
+          throw err;
+        }
+      }
+      admin.phone = nextPhone;
+    }
   }
 
   if (updates.name) admin.name = updates.name;
   if (updates.role) admin.role = updates.role;
   if (updates.zoomHostUserId !== undefined) {
-    admin.zoomHostUserId = updates.zoomHostUserId || null;
+    if (!updates.zoomHostUserId || !String(updates.zoomHostUserId).trim()) {
+      admin.zoomHostUserId = null;
+    } else {
+      admin.zoomHostUserId = await assertZoomHostUserIdAvailable(
+        updates.zoomHostUserId,
+        admin._id
+      );
+    }
   }
 
   await admin.save();

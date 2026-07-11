@@ -10,6 +10,8 @@ import {
 } from '@/api/client'
 import { API_BASE_URL } from '@/config'
 import { useSessionStore } from '@/stores/sessionStore'
+import { triggerLocalRecordingFinalize } from '@/components/LocalRecordingDialog'
+import { showDesktopMeetingEndedDialog } from '@/components/DesktopMeetingEndedDialog'
 import type { ActiveMeeting, SessionParticipant } from '@/types/session'
 
 import type { ApkUser } from '@/types/user'
@@ -70,7 +72,9 @@ export function useAdminSocket(enabled = true, isSuperAdmin = false) {
 
     socket.on('connect', () => {
       setSocketConnected(true)
-      queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+      if (!isSuperAdmin) {
+        queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+      }
     })
     socket.on('disconnect', () => setSocketConnected(false))
     socket.on('connect_error', () => setSocketConnected(false))
@@ -89,7 +93,7 @@ export function useAdminSocket(enabled = true, isSuperAdmin = false) {
     })
 
     socket.on('user:presence', (payload: { userId?: string; isOnline?: boolean }) => {
-      if (!payload?.userId) return
+      if (isSuperAdmin || !payload?.userId) return
       const { userId, isOnline } = payload
 
       queryClient.setQueryData<ApkUser[]>(['users'], (current) => {
@@ -106,28 +110,40 @@ export function useAdminSocket(enabled = true, isSuperAdmin = false) {
     })
 
     socket.on('session:started', (payload: { meeting: ActiveMeeting }) => {
+      if (isSuperAdmin) return
       if (payload?.meeting) {
         setMeetingStarted(payload.meeting)
       }
     })
 
     socket.on('participant:joined', (payload: SessionParticipant) => {
+      if (isSuperAdmin) return
       upsertParticipant({ ...payload, inCall: true })
     })
 
     socket.on('participant:left', (payload: { userId: string }) => {
+      if (isSuperAdmin) return
       removeParticipant(payload.userId)
     })
 
     socket.on('participant:muted', (payload: { userId: string; isMuted?: boolean }) => {
+      if (isSuperAdmin) return
       updateMute(payload.userId, payload.isMuted ?? true)
     })
 
     socket.on('participant:unmuted', (payload: { userId: string }) => {
+      if (isSuperAdmin) return
       updateMute(payload.userId, false)
     })
 
     socket.on('session:ended', () => {
+      if (isSuperAdmin) return
+      const { joinMode } = useSessionStore.getState()
+      if (joinMode === 'portal') {
+        triggerLocalRecordingFinalize()
+      } else {
+        showDesktopMeetingEndedDialog()
+      }
       clearSession()
       queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
     })

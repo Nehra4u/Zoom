@@ -1,4 +1,4 @@
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { createBrowserRouter, Navigate, RouterProvider } from 'react-router-dom'
 import { ProtectedRoute } from '@/auth/ProtectedRoute'
 import { RequireSuperAdmin } from '@/auth/RequireSuperAdmin'
 import { RequireRegularAdmin } from '@/auth/RequireRegularAdmin'
@@ -22,33 +22,43 @@ function HomeRedirect() {
   return <Navigate to={isSuperAdmin ? '/admins' : '/dashboard'} replace />
 }
 
+const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
+  {
+    element: <ProtectedRoute />,
+    children: [
+      {
+        element: <AppShell />,
+        children: [
+          { index: true, element: <HomeRedirect /> },
+          {
+            element: <RequireRegularAdmin />,
+            children: [
+              { path: 'dashboard', element: <DashboardPage /> },
+              { path: 'users', element: <UserListPage /> },
+              { path: 'users/new', element: <UserCreatePage /> },
+              { path: 'users/:id', element: <UserDetailPage /> },
+              { path: 'recordings', element: <RecordingListPage /> },
+            ],
+          },
+          { path: 'audit-logs', element: <AuditLogPage /> },
+          { path: 'system', element: <SystemPage /> },
+          { path: 'app-info', element: <AppDetailsPage /> },
+          {
+            element: <RequireSuperAdmin />,
+            children: [
+              { path: 'admins', element: <AdminListPage /> },
+              { path: 'admins/new', element: <AdminCreatePage /> },
+              { path: 'admins/:id', element: <AdminDetailPage /> },
+            ],
+          },
+        ],
+      },
+    ],
+  },
+  { path: '*', element: <Navigate to="/" replace /> },
+])
+
 export function AppRoutes() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route element={<ProtectedRoute />}>
-          <Route element={<AppShell />}>
-            <Route index element={<HomeRedirect />} />
-            <Route element={<RequireRegularAdmin />}>
-              <Route path="dashboard" element={<DashboardPage />} />
-              <Route path="users" element={<UserListPage />} />
-              <Route path="users/new" element={<UserCreatePage />} />
-              <Route path="users/:id" element={<UserDetailPage />} />
-              <Route path="recordings" element={<RecordingListPage />} />
-            </Route>
-            <Route path="audit-logs" element={<AuditLogPage />} />
-            <Route path="system" element={<SystemPage />} />
-            <Route path="app-info" element={<AppDetailsPage />} />
-            <Route element={<RequireSuperAdmin />}>
-              <Route path="admins" element={<AdminListPage />} />
-              <Route path="admins/new" element={<AdminCreatePage />} />
-              <Route path="admins/:id" element={<AdminDetailPage />} />
-            </Route>
-          </Route>
-        </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
-  )
+  return <RouterProvider router={router} />
 }

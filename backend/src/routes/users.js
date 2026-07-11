@@ -26,19 +26,18 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, email, phone, password, zoomDisplayName, status } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ error: 'Name, email, and password are required' });
+    const { username, phone, email, password, status } = req.body;
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username and password are required' });
     }
     if (password.length < 8) {
       return res.status(400).json({ error: 'Password must be at least 8 characters' });
     }
     const user = await createUser({
-      name,
-      email,
+      username,
       phone,
+      email,
       password,
-      zoomDisplayName,
       status,
       createdBy: req.admin,
     });
@@ -60,10 +59,10 @@ router.get('/:id', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, email, phone, zoomDisplayName, status } = req.body;
+    const { username, email, phone, zoomDisplayName, status } = req.body;
     const user = await updateUser(
       req.params.id,
-      { name, email, phone, zoomDisplayName, status },
+      { username, email, phone, zoomDisplayName, status },
       req.admin
     );
     res.json({ user });

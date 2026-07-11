@@ -3,6 +3,7 @@ import { PhoneOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { endMeeting } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
+import { triggerLocalRecordingFinalize } from '@/components/LocalRecordingDialog'
 import { useSessionStore } from '@/stores/sessionStore'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -25,6 +26,7 @@ export function EndMeetingButton({
   const endMutation = useMutation({
     mutationFn: endMeeting,
     onSuccess: () => {
+      triggerLocalRecordingFinalize()
       clearSession()
       void queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
       toast.success('Meeting ended')

@@ -1,6 +1,20 @@
 import { create } from 'zustand'
 import type { ActiveMeeting, SessionParticipant } from '@/types/session'
 
+export type MeetingJoinMode = 'portal' | 'desktop'
+
+const JOIN_MODE_KEY = 'zoomcontrol:joinMode'
+
+function loadJoinMode(): MeetingJoinMode {
+  try {
+    const value = localStorage.getItem(JOIN_MODE_KEY)
+    if (value === 'portal' || value === 'desktop') return value
+  } catch {
+    /* ignore */
+  }
+  return 'portal'
+}
+
 interface SessionStore {
   participants: SessionParticipant[]
   sessionActive: boolean
@@ -8,6 +22,8 @@ interface SessionStore {
   meeting: ActiveMeeting | null
   meetingOwnedByMe: boolean
   canEndMeeting: boolean
+  joinMode: MeetingJoinMode
+  desktopEndedDialogOpen: boolean
   portalJoined: boolean
   portalJoinAttempted: boolean
   portalJoinFailed: boolean
@@ -23,6 +39,8 @@ interface SessionStore {
   }) => void
   setMeetingStarted: (meeting: ActiveMeeting) => void
   applyLiveMeeting: (meeting: ActiveMeeting, opts?: { canEndMeeting?: boolean; meetingOwnedByMe?: boolean }) => void
+  setJoinMode: (mode: MeetingJoinMode) => void
+  setDesktopEndedDialogOpen: (open: boolean) => void
   setPortalJoined: (joined: boolean) => void
   setPortalJoinAttempted: (attempted: boolean) => void
   setPortalJoinFailed: (failed: boolean, error?: string | null) => void
@@ -41,6 +59,8 @@ export const useSessionStore = create<SessionStore>((set) => ({
   meeting: null,
   meetingOwnedByMe: false,
   canEndMeeting: false,
+  joinMode: loadJoinMode(),
+  desktopEndedDialogOpen: false,
   portalJoined: false,
   portalJoinAttempted: false,
   portalJoinFailed: false,
@@ -75,6 +95,7 @@ export const useSessionStore = create<SessionStore>((set) => ({
       sessionActive: true,
       meetingOwnedByMe: true,
       canEndMeeting: true,
+      desktopEndedDialogOpen: false,
     }),
 
   applyLiveMeeting: (meeting, opts) =>
@@ -84,7 +105,19 @@ export const useSessionStore = create<SessionStore>((set) => ({
       sessionActive: true,
       meetingOwnedByMe: opts?.meetingOwnedByMe ?? false,
       canEndMeeting: opts?.canEndMeeting ?? true,
+      desktopEndedDialogOpen: false,
     }),
+
+  setJoinMode: (joinMode) => {
+    try {
+      localStorage.setItem(JOIN_MODE_KEY, joinMode)
+    } catch {
+      /* ignore */
+    }
+    set({ joinMode })
+  },
+
+  setDesktopEndedDialogOpen: (desktopEndedDialogOpen) => set({ desktopEndedDialogOpen }),
 
   setPortalJoined: (portalJoined) => set({ portalJoined }),
 

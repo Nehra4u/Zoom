@@ -23,7 +23,7 @@ function toParticipant(session, user) {
     joinedAt: session.joinedAt?.toISOString() ?? null,
     leftAt: session.leftAt?.toISOString() ?? null,
     userStatus: user?.status ?? null,
-    email: user?.email ?? null,
+    username: user?.username ?? null,
   };
 }
 

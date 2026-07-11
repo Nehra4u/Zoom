@@ -86,7 +86,7 @@ function EditProfileDialog({ open, onClose, name, email, onSaved }: EditProfileD
     mutationFn: (payload: { name: string; email: string }) => updateAdminProfile(payload),
     onSuccess: (admin) => {
       toast.success('Profile updated')
-      onSaved(admin.name, admin.email)
+      onSaved(admin.name, admin.email ?? '')
       onClose()
     },
     onError: (err) => toast.error(getErrorMessage(err)),

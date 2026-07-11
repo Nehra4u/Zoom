@@ -13,10 +13,10 @@ import {
 function toPublicClient(user) {
   return {
     userId: user._id.toString(),
+    username: user.username,
     name: user.name,
-    email: user.email,
+    email: user.email ?? null,
     phone: user.phone ?? null,
-    profileComplete: user.profileComplete ?? false,
     active: user.status === 'active',
     status: user.status,
     zoomDisplayName: user.zoomDisplayName,
@@ -26,16 +26,16 @@ function toPublicClient(user) {
 const MAX_FAILED = 5;
 const LOCKOUT_MINUTES = 5;
 
-export async function loginClient(email, password, device = {}) {
+export async function loginClient(username, password, device = {}) {
   const { deviceId, deviceModel, manufacturer, androidVersion, appVersion } = device;
 
-  const user = await User.findOne({ email: email.toLowerCase(), status: { $ne: 'deleted' } });
+  const normalizedUsername = String(username ?? '').toLowerCase().trim();
+  const user = await User.findOne({ username: normalizedUsername, status: { $ne: 'deleted' } });
 
   if (!user) {
-    return { success: false, status: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' };
+    return { success: false, status: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' };
   }
 
-  // Check lockout
   if (user.lockedUntil && user.lockedUntil > new Date()) {
     const mins = Math.ceil((user.lockedUntil - Date.now()) / 60000);
     return {
@@ -52,10 +52,9 @@ export async function loginClient(email, password, device = {}) {
       user.lockedUntil = new Date(Date.now() + LOCKOUT_MINUTES * 60 * 1000);
     }
     await user.save();
-    return { success: false, status: 'INVALID_CREDENTIALS', message: 'Invalid email or password.' };
+    return { success: false, status: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' };
   }
 
-  // Reset on successful password check
   if (user.failedLoginAttempts > 0 || user.lockedUntil) {
     user.failedLoginAttempts = 0;
     user.lockedUntil = null;
@@ -70,7 +69,6 @@ export async function loginClient(email, password, device = {}) {
     return { success: false, status: 'USER_DEACTIVATED', message: 'Your account has been deactivated. Please contact support.' };
   }
 
-  // Check device conflict: is there already an active session on a DIFFERENT device?
   if (deviceId) {
     const activeSession = await DeviceSession.findOne({
       userId: user._id,
@@ -92,7 +90,6 @@ export async function loginClient(email, password, device = {}) {
     }
   }
 
-  // Issue JWT tokens
   const accessToken = signClientAccessToken(user);
   const refresh = signClientRefreshToken(user._id);
   await UserRefreshToken.create({
@@ -101,7 +98,6 @@ export async function loginClient(email, password, device = {}) {
     expiresAt: refresh.expiresAt,
   });
 
-  // Create or update DeviceSession
   const sessionId = generateSessionId();
   if (deviceId) {
     await DeviceSession.findOneAndUpdate(
@@ -121,19 +117,6 @@ export async function loginClient(email, password, device = {}) {
   }
 
   const session = { sessionId, userId: user._id.toString(), deviceId: deviceId ?? null };
-
-  // Profile incomplete: user is pending or profileComplete flag is false
-  if (user.status === 'pending' || !user.profileComplete) {
-    return {
-      success: true,
-      status: 'PROFILE_REQUIRED',
-      message: 'Please complete your profile.',
-      session,
-      user: toPublicClient(user),
-      accessToken,
-      refreshToken: refresh.token,
-    };
-  }
 
   return {
     success: true,
@@ -195,13 +178,11 @@ export async function refreshClientToken(refreshToken) {
 }
 
 export async function logoutClient(refreshToken, { userId, sessionId, deviceId, accessToken } = {}) {
-  // Revoke refresh token
   if (refreshToken) {
     const tokenHash = hashToken(refreshToken);
     await UserRefreshToken.updateOne({ tokenHash, revokedAt: null }, { revokedAt: new Date() });
   }
 
-  // Blocklist the access token immediately (don't wait for 15-min TTL)
   if (accessToken) {
     const payload = decodeTokenUnsafe(accessToken);
     if (payload?.jti && payload?.sub && payload?.exp) {
@@ -213,7 +194,6 @@ export async function logoutClient(refreshToken, { userId, sessionId, deviceId, 
     }
   }
 
-  // Mark device session as logged out
   if (deviceId && userId) {
     await DeviceSession.updateOne(
       { userId, deviceId, loggedOut: false },

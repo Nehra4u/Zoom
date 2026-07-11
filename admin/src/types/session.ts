@@ -35,6 +35,16 @@ export interface SessionSnapshot {
   participants: SessionParticipant[]
 }
 
+export interface MeetingJoinInfo {
+  meetingNumber: string
+  password: string
+  startUrl: string | null
+  joinUrl: string | null
+  displayName: string
+  isHost: boolean
+  hostDisplayName: string | null
+}
+
 export type SessionSocketEvent =
   | 'participant:joined'
   | 'participant:left'

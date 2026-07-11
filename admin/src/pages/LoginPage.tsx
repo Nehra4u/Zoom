@@ -19,7 +19,7 @@ export function LoginPage() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -43,8 +43,10 @@ export function LoginPage() {
     e.preventDefault()
     setLoading(true)
     try {
-      const loggedIn = await login(email, password)
-      await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+      const loggedIn = await login(identifier, password)
+      if (loggedIn.role !== 'super_admin') {
+        await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+      }
       toast.success('Welcome back')
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname
       const defaultPath = loggedIn.role === 'super_admin' ? '/admins' : '/dashboard'
@@ -132,15 +134,15 @@ export function LoginPage() {
             <CardContent className="mt-1">
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
+                  <Label htmlFor="identifier">Email, phone, or name</Label>
                   <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="admin@zoommeets.com"
+                    id="identifier"
+                    type="text"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
+                    placeholder="Your login name, email, or phone"
                     required
-                    autoComplete="email"
+                    autoComplete="username"
                     autoFocus
                     className="h-11 rounded-xl bg-white/70 px-3.5"
                   />

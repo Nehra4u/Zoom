@@ -11,6 +11,7 @@ import {
 } from '@/api/admins'
 import { getErrorMessage } from '@/api/client'
 import { useAuth } from '@/auth/AuthContext'
+import { ZoomHostUserField } from '@/components/ZoomHostUserField'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,6 +41,7 @@ export function AdminDetailPage() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [role, setRole] = useState<'admin' | 'super_admin'>('admin')
   const [zoomHostUserId, setZoomHostUserId] = useState('')
 
@@ -52,7 +54,8 @@ export function AdminDetailPage() {
   useEffect(() => {
     if (admin) {
       setName(admin.name)
-      setEmail(admin.email)
+      setEmail(admin.email ?? '')
+      setPhone(admin.phone ?? '')
       setRole(admin.role)
       setZoomHostUserId(admin.zoomHostUserId ?? '')
     }
@@ -64,9 +67,17 @@ export function AdminDetailPage() {
     mutationFn: (payload: {
       name: string
       email: string
+      phone: string
       role: 'admin' | 'super_admin'
       zoomHostUserId: string | null
-    }) => updateAdmin(id, payload),
+    }) =>
+      updateAdmin(id, {
+        name: payload.name,
+        email: payload.email || undefined,
+        phone: payload.phone || undefined,
+        role: payload.role,
+        zoomHostUserId: payload.zoomHostUserId,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admins'] })
       queryClient.invalidateQueries({ queryKey: ['admins', id] })
@@ -114,6 +125,7 @@ export function AdminDetailPage() {
     updateMutation.mutate({
       name,
       email,
+      phone,
       role,
       zoomHostUserId: zoomHostUserId.trim() || null,
     })
@@ -146,8 +158,12 @@ export function AdminDetailPage() {
               <Input id="edit-name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="edit-email">Email</Label>
-              <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="edit-email">Email (optional)</Label>
+              <Input id="edit-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Phone (optional)</Label>
+              <Input id="edit-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="edit-role">Role</Label>
@@ -161,19 +177,13 @@ export function AdminDetailPage() {
                 <option value="super_admin">Super admin</option>
               </select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-zoom-host">Zoom host user ID</Label>
-              <Input
+            {admin.role === 'admin' && (
+              <ZoomHostUserField
                 id="edit-zoom-host"
                 value={zoomHostUserId}
-                onChange={(e) => setZoomHostUserId(e.target.value)}
-                placeholder="Leave empty to use default ZOOM_HOST_USER_ID"
+                onChange={setZoomHostUserId}
               />
-              <p className="text-xs text-muted-foreground">
-                Assign each admin their own Zoom Business user ID so they can run separate meetings in
-                parallel.
-              </p>
-            </div>
+            )}
             <Button type="submit" disabled={updateMutation.isPending}>
               Save changes
             </Button>

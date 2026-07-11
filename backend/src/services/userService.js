@@ -6,7 +6,6 @@ import { writeAuditLog } from './auditService.js';
 import {
   forceLeaveUser,
   forceLogoutUser,
-  notifySessionStarted,
   notifyUserActivated,
   notifyUserDeactivated,
 } from './notificationService.js';
@@ -15,14 +14,14 @@ import { revokeOutstandingUserToken } from './zoomTokenService.js';
 import { getUserForAdmin, userScopeQuery, assertRegularAdmin } from './adminScope.js';
 import { getOnlineUserIds } from '../socket/index.js';
 
-// Maximum number of APK user accounts that can exist at once (excludes deleted accounts).
 export const MAX_USERS = 300;
 
 function toPublicUser(user, deviceSession = null, onlineUserIds = null) {
   return {
     id: user._id.toString(),
+    username: user.username,
     name: user.name,
-    email: user.email,
+    email: user.email ?? null,
     phone: user.phone ?? null,
     status: user.status,
     zoomDisplayName: user.zoomDisplayName,
@@ -30,7 +29,6 @@ function toPublicUser(user, deviceSession = null, onlineUserIds = null) {
     createdAt: user.createdAt,
     updatedAt: user.updatedAt,
     lastActiveAt: user.lastActiveAt,
-    // Additive fields: last-seen falls back to lastActiveAt when no device session exists yet.
     lastSeenAt: deviceSession?.lastSeenAt ?? user.lastActiveAt ?? null,
     device: deviceSession
       ? {
@@ -43,8 +41,6 @@ function toPublicUser(user, deviceSession = null, onlineUserIds = null) {
           loggedOut: deviceSession.loggedOut,
         }
       : null,
-    // "isOnline" = currently has a live /client websocket connection (distinct from
-    // `status === 'active'`, which just means the account is eligible/activated).
     isOnline: onlineUserIds ? onlineUserIds.has(user._id.toString()) : false,
   };
 }
@@ -86,11 +82,18 @@ export async function getUserById(id, admin = null) {
   return toPublicUser(user, deviceSession, getOnlineUserIds());
 }
 
-export async function createUser({ name, email, phone, password, zoomDisplayName, status, createdBy }) {
+export async function createUser({ username, phone, email, password, status, createdBy }) {
   assertRegularAdmin(createdBy);
-  const existing = await User.findOne({ email: email.toLowerCase() });
+  const normalizedUsername = String(username ?? '').toLowerCase().trim();
+  if (!normalizedUsername) {
+    const err = new Error('Username is required');
+    err.status = 400;
+    throw err;
+  }
+
+  const existing = await User.findOne({ username: normalizedUsername });
   if (existing) {
-    const err = new Error('Email already in use');
+    const err = new Error('Username already in use');
     err.status = 409;
     throw err;
   }
@@ -104,12 +107,13 @@ export async function createUser({ name, email, phone, password, zoomDisplayName
 
   const passwordHash = await bcrypt.hash(password, 12);
   const user = await User.create({
-    name,
-    email: email.toLowerCase(),
+    username: normalizedUsername,
+    name: normalizedUsername,
+    email: email ? String(email).toLowerCase().trim() : null,
     phone: phone || null,
     passwordHash,
-    zoomDisplayName: zoomDisplayName || name,
-    status: status ?? 'pending',
+    zoomDisplayName: normalizedUsername,
+    status: status ?? 'active',
     createdBy: createdBy.sub,
   });
 
@@ -132,17 +136,32 @@ export async function updateUser(id, updates, actor) {
     throw err;
   }
 
-  if (updates.email && updates.email.toLowerCase() !== user.email) {
-    const existing = await User.findOne({ email: updates.email.toLowerCase() });
-    if (existing) {
-      const err = new Error('Email already in use');
-      err.status = 409;
+  if (updates.username !== undefined) {
+    const normalizedUsername = String(updates.username).toLowerCase().trim();
+    if (!normalizedUsername) {
+      const err = new Error('Username cannot be empty');
+      err.status = 400;
       throw err;
     }
-    user.email = updates.email.toLowerCase();
+    if (normalizedUsername !== user.username) {
+      const existing = await User.findOne({ username: normalizedUsername });
+      if (existing) {
+        const err = new Error('Username already in use');
+        err.status = 409;
+        throw err;
+      }
+      user.username = normalizedUsername;
+      user.name = normalizedUsername;
+      if (!updates.zoomDisplayName) {
+        user.zoomDisplayName = normalizedUsername;
+      }
+    }
   }
 
-  if (updates.name !== undefined) user.name = updates.name;
+  if (updates.email !== undefined) {
+    user.email = updates.email ? String(updates.email).toLowerCase().trim() : null;
+  }
+
   const phoneChanged =
     updates.phone !== undefined && (updates.phone || null) !== (user.phone || null);
   if (updates.phone !== undefined) user.phone = updates.phone || null;
@@ -231,8 +250,6 @@ export async function deactivateUser(id, actor) {
   return toPublicUser(user);
 }
 
-// Additive: force-logs-out a user's devices without changing their account status
-// (distinct from deactivate, which also disables the account).
 export async function logoutUserDevices(id, actor) {
   assertRegularAdmin(actor);
   const user = await getUserForAdmin(actor, id);
@@ -242,11 +259,6 @@ export async function logoutUserDevices(id, actor) {
     throw err;
   }
 
-  await DeviceSession.updateMany(
-    { userId: user._id, active: true },
-    { $set: { active: false, loggedOut: true } }
-  );
-
   await writeAuditLog({
     actor,
     action: 'user_logged_out',
@@ -255,7 +267,6 @@ export async function logoutUserDevices(id, actor) {
 
   await revokeOutstandingUserToken(user, actor);
 
-  // Tell the client it's actually logged out (clears its session), not just removed from a call.
   forceLogoutUser(user._id.toString(), 'admin_logout');
 
   const activeSession = await SessionState.findOne({ userId: user._id, inCall: true });
@@ -266,8 +277,9 @@ export async function logoutUserDevices(id, actor) {
     });
   }
 
-  const deviceSession = await DeviceSession.findOne({ userId: user._id }).sort({ lastSeenAt: -1 });
-  return toPublicUser(user, deviceSession);
+  await DeviceSession.deleteMany({ userId: user._id });
+
+  return toPublicUser(user, null, getOnlineUserIds());
 }
 
 export async function deleteUser(id, actor) {

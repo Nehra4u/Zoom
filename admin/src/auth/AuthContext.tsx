@@ -28,7 +28,7 @@ interface AuthContextValue {
   admin: Admin | null
   isAuthenticated: boolean
   isSuperAdmin: boolean
-  login: (email: string, password: string) => Promise<Admin>
+  login: (identifier: string, password: string) => Promise<Admin>
   logout: () => Promise<void>
   setAdminProfile: (admin: Admin) => void
 }
@@ -65,8 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const login = useCallback(async (email: string, password: string) => {
-    const result = await apiLogin(email, password)
+  const login = useCallback(async (identifier: string, password: string) => {
+    const result = await apiLogin(identifier, password)
     setStoredTokens(result.accessToken, result.refreshToken)
     setStoredAdmin(result.admin)
     if (result.sessionId) {

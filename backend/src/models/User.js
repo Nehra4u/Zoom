@@ -2,8 +2,9 @@ import mongoose from 'mongoose';
 
 const userSchema = new mongoose.Schema(
   {
+    username: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: { type: String, default: null, lowercase: true, trim: true },
     phone: { type: String, default: null, trim: true },
     passwordHash: { type: String, required: true },
     status: {
@@ -15,7 +16,6 @@ const userSchema = new mongoose.Schema(
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
     lastActiveAt: { type: Date, default: null },
     deletedAt: { type: Date, default: null },
-    profileComplete: { type: Boolean, default: false },
     failedLoginAttempts: { type: Number, default: 0 },
     lockedUntil: { type: Date, default: null },
     lastSdkJti: { type: String, default: null },

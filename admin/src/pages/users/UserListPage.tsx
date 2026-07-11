@@ -71,8 +71,8 @@ export function UserListPage() {
       if (filter !== 'all' && filter !== 'logged_out' && user.status !== filter) return false
       if (!q) return true
       return (
-        user.name.toLowerCase().includes(q) ||
-        user.email.toLowerCase().includes(q) ||
+        user.username.toLowerCase().includes(q) ||
+        (user.email ?? '').toLowerCase().includes(q) ||
         (user.phone ?? '').toLowerCase().includes(q)
       )
     })
@@ -88,7 +88,7 @@ export function UserListPage() {
           <input
             value={search}
             onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder="Search users by name or phone"
+            placeholder="Search users by username or phone"
             className="w-full rounded-xl border border-input bg-card py-2 pl-9 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/50"
           />
         </div>
@@ -143,13 +143,13 @@ export function UserListPage() {
             const avatarBlock = (
               <div className={cn('flex min-w-0 items-center gap-4', isGreyedOut && 'opacity-60')}>
                 <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chart-1/15 text-sm font-medium text-chart-1">
-                  {initials(user.name)}
+                  {initials(user.username)}
                   {user.isOnline && (
                     <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success" />
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-base font-bold text-foreground">{user.name}</p>
+                  <p className="truncate text-base font-bold text-foreground">{user.username}</p>
                   <p className="truncate text-xs text-muted-foreground">{user.phone || 'No phone on file'}</p>
                 </div>
               </div>

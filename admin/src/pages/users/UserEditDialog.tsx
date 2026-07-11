@@ -44,13 +44,14 @@ export function UserEditDialog({ user, onClose }: UserEditDialogProps) {
     setChangeMobile(false)
   }, [user?.id])
 
-  // Saving bundles the profile update with an optional device unlink (selected via the
-  // "Change Mobile" chip) — reuses the existing logout endpoint, which clears the
-  // device's active/loggedOut flags that otherwise block signing in from a new phone.
   const saveMutation = useMutation({
-    mutationFn: async (payload: { name: string; email: string; phone: string; zoomDisplayName: string }) => {
+    mutationFn: async (payload: { username: string; email: string; phone: string }) => {
       const phoneChanged = payload.phone !== (user?.phone ?? '')
-      await updateUser(user!.id, payload)
+      await updateUser(user!.id, {
+        username: payload.username,
+        email: payload.email || undefined,
+        phone: payload.phone,
+      })
       if (changeMobile && !phoneChanged) {
         await logoutUser(user!.id)
       }
@@ -59,9 +60,9 @@ export function UserEditDialog({ user, onClose }: UserEditDialogProps) {
     onSuccess: (phoneChanged) => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       if (changeMobile && !phoneChanged) {
-        toast.success('User updated — device unlinked for a new phone')
+        toast.success('User updated — device cleared for a new phone')
       } else if (phoneChanged) {
-        toast.success('User updated — device unlinked for new phone number')
+        toast.success('User updated — device cleared for new phone number')
       } else {
         toast.success('User updated')
       }
@@ -74,10 +75,9 @@ export function UserEditDialog({ user, onClose }: UserEditDialogProps) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     saveMutation.mutate({
-      name: String(form.get('name') ?? ''),
+      username: String(form.get('username') ?? ''),
       email: String(form.get('email') ?? ''),
       phone: String(form.get('phone') ?? ''),
-      zoomDisplayName: String(form.get('zoomDisplayName') ?? ''),
     })
   }
 
@@ -88,33 +88,27 @@ export function UserEditDialog({ user, onClose }: UserEditDialogProps) {
           <>
             <DialogHeader>
               <DialogTitle>Edit profile</DialogTitle>
-              <DialogDescription>Update account details for {user.name}.</DialogDescription>
+              <DialogDescription>Update account details for {user.username}.</DialogDescription>
             </DialogHeader>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant={statusVariant(user.status)}>
-                {statusLabel(user.status)}
-              </Badge>
+              <Badge variant={statusVariant(user.status)}>{statusLabel(user.status)}</Badge>
               {user.device?.loggedOut && <Badge variant="outline">Logged out</Badge>}
               <span className="text-xs text-muted-foreground">Last seen: {formatDateTime(user.lastSeenAt)}</span>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="edit-name">Full name</Label>
-                <Input id="edit-name" name="name" defaultValue={user.name} required />
+                <Label htmlFor="edit-username">Username</Label>
+                <Input id="edit-username" name="username" defaultValue={user.username} required autoComplete="off" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-email">Email</Label>
-                <Input id="edit-email" name="email" type="email" defaultValue={user.email} required />
+                <Label htmlFor="edit-email">Email (optional)</Label>
+                <Input id="edit-email" name="email" type="email" defaultValue={user.email ?? ''} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="edit-phone">Phone</Label>
+                <Label htmlFor="edit-phone">Phone (optional)</Label>
                 <Input id="edit-phone" name="phone" type="tel" defaultValue={user.phone ?? ''} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="edit-zoom">Zoom display name</Label>
-                <Input id="edit-zoom" name="zoomDisplayName" defaultValue={user.zoomDisplayName} required />
               </div>
 
               <div className="rounded-xl border border-border bg-muted/40 p-4">
@@ -140,8 +134,7 @@ export function UserEditDialog({ user, onClose }: UserEditDialogProps) {
 
                 {changeMobile && (
                   <p className="mb-3 rounded-lg bg-primary/5 p-2 text-[11px] text-muted-foreground">
-                    On save, this device will be unlinked so the user can sign in from a new phone without changing
-                    their number.
+                    On save, device details will be cleared so the user can sign in from a new phone.
                   </p>
                 )}
 

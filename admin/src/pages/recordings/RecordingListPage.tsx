@@ -2,7 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, ExternalLink, Film, LoaderCircle, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { deleteRecording, fetchRecordings, fetchRecordingPlayUrl, syncRecordingsFromZoom } from '@/api/recordings'
+import {
+  deleteRecording,
+  downloadRecording,
+  fetchRecordings,
+  fetchRecordingPlayUrl,
+  syncRecordingsFromZoom,
+} from '@/api/recordings'
 import { getErrorMessage } from '@/api/client'
 import { ExpiryCountdown } from '@/components/ExpiryCountdown'
 import { Button } from '@/components/ui/button'
@@ -14,6 +20,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import type { Recording } from '@/types/recording'
@@ -27,6 +34,12 @@ function formatDuration(seconds: number) {
 function formatFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function safeFileName(topic: string, fileType: string) {
+  const base = topic.replace(/[^\w.-]+/g, '_').slice(0, 80) || 'recording'
+  const ext = fileType.toLowerCase() || 'mp4'
+  return `${base}.${ext}`
 }
 
 function RecordingsTableSkeleton({ rows = 6 }: { rows?: number }) {
@@ -56,35 +69,89 @@ function RecordingsTableSkeleton({ rows = 6 }: { rows?: number }) {
   )
 }
 
+function RecordingLoadingDialog({
+  open,
+  action,
+  passcode,
+}: {
+  open: boolean
+  action: 'play' | 'download' | null
+  passcode: string | null
+}) {
+  return (
+    <Dialog open={open}>
+      <DialogContent className="sm:max-w-md" onPointerDownOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle>Loading recording…</DialogTitle>
+          <DialogDescription>
+            {action === 'download'
+              ? 'Fetching a secure download from Zoom cloud.'
+              : 'Preparing playback URL from Zoom cloud.'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="flex flex-col items-center gap-4">
+            <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+            <Progress value={35} indeterminate />
+          </div>
+          {passcode && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+              <p className="mb-1 text-muted-foreground">Recording passcode (if prompted):</p>
+              <code className="font-mono text-foreground">{passcode}</code>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 function RecordingRow({
   recording,
   onDeleted,
+  onActionStart,
+  onActionEnd,
 }: {
   recording: Recording
   onDeleted: (id: string) => void
+  onActionStart: (action: 'play' | 'download') => void
+  onActionEnd: (passcode?: string | null) => void
 }) {
   const [deleteOpen, setDeleteOpen] = useState(false)
 
   const playMutation = useMutation({
     mutationFn: () => fetchRecordingPlayUrl(recording.id),
+    onMutate: () => onActionStart('play'),
     onSuccess: (data) => {
+      onActionEnd(data.passcode)
       window.open(data.playUrl, '_blank', 'noopener,noreferrer')
-      toast.success('Opening recording — URL is time-limited')
+      if (data.passcode) {
+        toast.success('Opening recording — passcode available if Zoom prompts')
+      } else {
+        toast.success('Opening recording — URL is time-limited')
+      }
     },
-    onError: (err) => toast.error(getErrorMessage(err)),
+    onError: (err) => {
+      onActionEnd()
+      toast.error(getErrorMessage(err))
+    },
   })
 
   const downloadMutation = useMutation({
-    mutationFn: () => fetchRecordingPlayUrl(recording.id),
-    onSuccess: (data) => {
-      if (!data.downloadUrl) {
-        toast.error('Download URL not available from Zoom')
-        return
-      }
-      window.open(data.downloadUrl, '_blank', 'noopener,noreferrer')
-      toast.success('Download started — URL is time-limited')
+    mutationFn: async () => {
+      const meta = await fetchRecordingPlayUrl(recording.id)
+      await downloadRecording(recording.id, safeFileName(recording.topic, recording.fileType))
+      return meta
     },
-    onError: (err) => toast.error(getErrorMessage(err)),
+    onMutate: () => onActionStart('download'),
+    onSuccess: (data) => {
+      onActionEnd(data.passcode)
+      toast.success('Download started')
+    },
+    onError: (err) => {
+      onActionEnd()
+      toast.error(getErrorMessage(err))
+    },
   })
 
   const deleteMutation = useMutation({
@@ -96,6 +163,8 @@ function RecordingRow({
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
+
+  const isBusy = playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending
 
   return (
     <>
@@ -112,7 +181,7 @@ function RecordingRow({
             <Button
               size="icon-sm"
               variant="outline"
-              disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
+              disabled={isBusy}
               onClick={() => playMutation.mutate()}
               aria-label={`Play ${recording.topic}`}
               title="Play recording"
@@ -122,17 +191,21 @@ function RecordingRow({
             <Button
               size="icon-sm"
               variant="outline"
-              disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
+              disabled={isBusy}
               onClick={() => downloadMutation.mutate()}
               aria-label={`Download ${recording.topic}`}
               title="Download recording"
             >
-              {downloadMutation.isPending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              {downloadMutation.isPending ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
             </Button>
             <Button
               size="icon-sm"
               variant="outline"
-              disabled={playMutation.isPending || downloadMutation.isPending || deleteMutation.isPending}
+              disabled={isBusy}
               onClick={() => setDeleteOpen(true)}
               aria-label={`Delete ${recording.topic}`}
               title="Delete recording"
@@ -172,6 +245,8 @@ function RecordingRow({
 export function RecordingListPage() {
   const queryClient = useQueryClient()
   const autoSyncedRef = useRef(false)
+  const [loadingAction, setLoadingAction] = useState<'play' | 'download' | null>(null)
+  const [loadingPasscode, setLoadingPasscode] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['recordings'],
@@ -228,8 +303,20 @@ export function RecordingListPage() {
     )
   }
 
+  function handleActionStart(action: 'play' | 'download') {
+    setLoadingAction(action)
+    setLoadingPasscode(null)
+  }
+
+  function handleActionEnd(passcode?: string | null) {
+    setLoadingAction(null)
+    if (passcode) setLoadingPasscode(passcode)
+  }
+
   return (
     <div className="space-y-6">
+      <RecordingLoadingDialog open={loadingAction !== null} action={loadingAction} passcode={loadingPasscode} />
+
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 space-y-0">
           <div className="space-y-1.5">
@@ -293,7 +380,13 @@ export function RecordingListPage() {
               </TableHeader>
               <TableBody>
                 {recordings.map((r) => (
-                  <RecordingRow key={r.id} recording={r} onDeleted={handleRecordingDeleted} />
+                  <RecordingRow
+                    key={r.id}
+                    recording={r}
+                    onDeleted={handleRecordingDeleted}
+                    onActionStart={handleActionStart}
+                    onActionEnd={handleActionEnd}
+                  />
                 ))}
               </TableBody>
             </Table>
@@ -309,8 +402,8 @@ export function RecordingListPage() {
           <CardContent className="flex items-start gap-2 text-sm text-muted-foreground">
             <ExternalLink className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
-              Play URLs are time-limited and fetched from the Zoom API at click time — never stored in our database.
-              Sync pulls metadata from Zoom cloud; webhooks keep the list updated automatically.
+              Play URLs include Zoom passcodes when required. Downloads are proxied through the backend with OAuth so
+              you are not prompted for a password in the browser.
             </p>
           </CardContent>
         </Card>

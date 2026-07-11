@@ -25,6 +25,20 @@ export async function fetchRecordingPlayUrl(id: string) {
   return data
 }
 
+export async function downloadRecording(id: string, fileName: string) {
+  const response = await api.get(`/recordings/${id}/download`, {
+    responseType: 'blob',
+  })
+  const blob = response.data as Blob
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = fileName
+  anchor.click()
+  URL.revokeObjectURL(url)
+  return blob
+}
+
 export async function deleteRecording(id: string) {
   const { data } = await api.delete<{ ok: boolean }>(`/recordings/${id}`)
   return data

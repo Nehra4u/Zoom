@@ -4,7 +4,8 @@ export type AdminStatus = 'active' | 'inactive' | 'deleted'
 export interface Admin {
   id: string
   name: string
-  email: string
+  email: string | null
+  phone: string | null
   role: AdminRole
   status: AdminStatus
   createdBy: string | null

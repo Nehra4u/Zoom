@@ -31,13 +31,11 @@ export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogPro
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
-    const name = String(form.get('name') ?? '')
     mutation.mutate({
-      name,
-      email: String(form.get('email') ?? ''),
-      phone: String(form.get('phone') ?? '') || undefined,
+      username: String(form.get('username') ?? ''),
       password: String(form.get('password') ?? ''),
-      zoomDisplayName: String(form.get('zoomDisplayName') ?? '') || name,
+      phone: String(form.get('phone') ?? '') || undefined,
+      email: String(form.get('email') ?? '') || undefined,
       status: 'active',
     })
   }
@@ -52,8 +50,7 @@ export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogPro
         <DialogHeader>
           <DialogTitle>Add user</DialogTitle>
           <DialogDescription>
-            Create a new APK client account. The account is active immediately. Password must be at least 8
-            characters.
+            Create a new APK client account. Username must be unique. Password must be at least 8 characters.
           </DialogDescription>
         </DialogHeader>
 
@@ -65,24 +62,20 @@ export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogPro
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="create-name">Full name</Label>
-              <Input id="create-name" name="name" required />
+              <Label htmlFor="create-username">Username</Label>
+              <Input id="create-username" name="username" required autoComplete="off" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="create-email">Email</Label>
-              <Input id="create-email" name="email" type="email" required />
+              <Label htmlFor="create-password">Password</Label>
+              <Input id="create-password" name="password" type="password" minLength={8} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="create-phone">Phone (optional)</Label>
               <Input id="create-phone" name="phone" type="tel" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="create-zoom">Zoom display name</Label>
-              <Input id="create-zoom" name="zoomDisplayName" placeholder="Shown in Zoom session" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="create-password">Password</Label>
-              <Input id="create-password" name="password" type="password" minLength={8} required />
+              <Label htmlFor="create-email">Email (optional)</Label>
+              <Input id="create-email" name="email" type="email" />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose}>

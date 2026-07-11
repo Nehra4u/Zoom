@@ -54,7 +54,7 @@ export function signClientAccessToken(user) {
     {
       sub: user._id.toString(),
       type: 'client',
-      email: user.email,
+      username: user.username,
       jti,
     },
     clientSecret(),

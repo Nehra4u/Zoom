@@ -208,6 +208,7 @@ export async function fetchMeetingRecordings(meetingId) {
       topic: 'Mock Meeting Recording',
       start_time: new Date().toISOString(),
       duration: 30,
+      recording_play_passcode: 'mock-passcode',
       recording_files: [
         {
           id: `mock-rec-${meetingId}`,
@@ -217,6 +218,7 @@ export async function fetchMeetingRecordings(meetingId) {
           file_type: 'MP4',
           file_size: 1024000,
           play_url: 'https://example.com/mock-recording.mp4',
+          download_url: 'https://example.com/mock-recording.mp4',
           status: 'completed',
         },
       ],
@@ -225,9 +227,12 @@ export async function fetchMeetingRecordings(meetingId) {
 
   const token = await getZoomAccessToken();
   const encodedId = encodeMeetingUuid(String(meetingId));
-  const response = await fetch(`https://api.zoom.us/v2/meetings/${encodedId}/recordings`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  const response = await fetch(
+    `https://api.zoom.us/v2/meetings/${encodedId}/recordings?include_fields=download_access_token`,
+    {
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
 
   if (!response.ok) {
     const text = await response.text();
@@ -400,6 +405,51 @@ export async function fetchZoomHostUserId() {
 
   const data = await response.json();
   return data.id;
+}
+
+export async function listZoomAccountUsers() {
+  if (isMockMode()) {
+    return [
+      {
+        id: process.env.ZOOM_HOST_USER_ID ?? 'mock-host-user-id',
+        email: 'host@zoomcontrol.local',
+        displayName: 'Mock Host',
+      },
+    ];
+  }
+
+  const token = await getZoomAccessToken();
+  const users = [];
+  let nextPageToken = null;
+
+  do {
+    const params = new URLSearchParams({
+      status: 'active',
+      page_size: '300',
+    });
+    if (nextPageToken) params.set('next_page_token', nextPageToken);
+
+    const response = await fetch(`https://api.zoom.us/v2/users?${params}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      throw new Error(`Zoom list users failed: ${response.status} ${text}`);
+    }
+
+    const data = await response.json();
+    for (const user of data.users ?? []) {
+      users.push({
+        id: user.id,
+        email: user.email ?? null,
+        displayName: [user.first_name, user.last_name].filter(Boolean).join(' ') || user.email || user.id,
+      });
+    }
+    nextPageToken = data.next_page_token ?? null;
+  } while (nextPageToken);
+
+  return users;
 }
 
 export async function fetchHostZakToken(hostUserId = null) {

@@ -1,8 +1,8 @@
 import { api } from './client'
 import type { Admin, AuthResponse } from '@/types/admin'
 
-export async function loginAdmin(email: string, password: string) {
-  const { data } = await api.post<AuthResponse>('/auth/admin/login', { email, password })
+export async function loginAdmin(identifier: string, password: string) {
+  const { data } = await api.post<AuthResponse>('/auth/admin/login', { identifier, password })
   return data
 }
 
@@ -24,17 +24,30 @@ export async function fetchAdmin(id: string) {
 
 export async function createAdmin(payload: {
   name: string
-  email: string
+  email?: string
   password: string
+  phone?: string
   role?: 'admin' | 'super_admin'
+  zoomHostUserId?: string | null
 }) {
   const { data } = await api.post<{ admin: Admin }>('/admins', payload)
   return data.admin
 }
 
+export interface ZoomAccountUser {
+  id: string
+  email: string | null
+  displayName: string
+}
+
+export async function fetchZoomAccountUsers() {
+  const { data } = await api.get<{ users: ZoomAccountUser[] }>('/admins/zoom-users')
+  return data.users
+}
+
 export async function updateAdmin(
   id: string,
-  payload: { name?: string; email?: string; role?: string; zoomHostUserId?: string | null }
+  payload: { name?: string; email?: string; phone?: string; role?: string; zoomHostUserId?: string | null }
 ) {
   const { data } = await api.patch<{ admin: Admin }>(`/admins/${id}`, payload)
   return data.admin

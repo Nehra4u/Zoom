@@ -204,6 +204,14 @@ export async function startMeeting(actor) {
     throw err;
   }
 
+  const adminDoc = await Admin.findById(actor.sub);
+  if (!isMockMode() && !adminDoc?.zoomHostUserId) {
+    const err = new Error('Zoom license not assigned — contact super admin');
+    err.status = 400;
+    err.code = 'ZOOM_LICENSE_REQUIRED';
+    throw err;
+  }
+
   const hostUserId = await resolveHostUserId(actor.sub);
   const existingOnHost = hostUserId
     ? await ActiveMeeting.findOne({ status: 'live', hostUserId })
@@ -325,12 +333,17 @@ export async function getMeetingJoinInfo(actor) {
   const live = accessible.meeting;
   await assertCanAccessMeeting(actor, live);
 
+  const isHost = accessible.ownedByMe;
+  const displayName = await getAdminDisplayName(actor.sub);
+
   return {
     meetingNumber: live.meetingNumber,
     password: live.password ?? '',
-    startUrl: live.startUrl ?? null,
     joinUrl: live.joinUrl ?? `https://zoom.us/j/${live.meetingNumber}`,
-    displayName: live.hostDisplayName ?? (await getAdminDisplayName(actor.sub)),
+    startUrl: isHost ? (live.startUrl ?? null) : null,
+    isHost,
+    hostDisplayName: live.hostDisplayName ?? null,
+    displayName,
   };
 }
 

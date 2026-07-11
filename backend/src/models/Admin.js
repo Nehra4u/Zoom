@@ -3,7 +3,8 @@ import mongoose from 'mongoose';
 const adminSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, lowercase: true, trim: true },
+    email: { type: String, default: null, lowercase: true, trim: true },
+    phone: { type: String, default: null, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['admin', 'super_admin'], default: 'admin' },
     status: { type: String, enum: ['active', 'inactive', 'deleted'], default: 'active' },
@@ -23,5 +24,7 @@ const adminSchema = new mongoose.Schema(
 adminSchema.index({ role: 1 });
 adminSchema.index({ status: 1 });
 adminSchema.index({ createdBy: 1 });
+adminSchema.index({ email: 1 }, { unique: true, sparse: true });
+adminSchema.index({ phone: 1 }, { unique: true, sparse: true });
 
 export const Admin = mongoose.model('Admin', adminSchema);

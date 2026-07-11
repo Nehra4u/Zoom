@@ -1,5 +1,5 @@
 import { Recording } from '../models/Recording.js';
-import { fetchMeetingRecordings, fetchUserRecordings, deleteCloudRecordingFile } from './zoomApi.js';
+import { fetchMeetingRecordings, fetchUserRecordings, deleteCloudRecordingFile, getZoomAccessToken } from './zoomApi.js';
 import { writeAuditLog } from './auditService.js';
 import { recordingScopeQuery, assertRegularAdmin } from './adminScope.js';
 import {
@@ -15,6 +15,35 @@ function computeExpiresAt(startTime, retentionDays) {
   const expiresAt = new Date(startTime);
   expiresAt.setDate(expiresAt.getDate() + retentionDays);
   return expiresAt;
+}
+
+function appendRecordingPasscode(url, passcode) {
+  if (!url || !passcode) return url;
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}pwd=${encodeURIComponent(passcode)}`;
+}
+
+function resolveRecordingPasscode(zoomData, file) {
+  return (
+    zoomData?.recording_play_passcode ||
+    zoomData?.password ||
+    file?.password ||
+    null
+  );
+}
+
+async function resolveRecordingFile(doc) {
+  const zoomData = await fetchMeetingRecordings(doc.zoomMeetingId);
+  const file = zoomData.recording_files?.find((f) => f.id === doc.zoomRecordingId)
+    ?? zoomData.recording_files?.[0];
+
+  if (!file?.play_url) {
+    const err = new Error('Play URL not available from Zoom');
+    err.status = 502;
+    throw err;
+  }
+
+  return { zoomData, file };
 }
 
 function toPublicRecording(recording, retentionDays = null) {
@@ -142,15 +171,8 @@ export async function getFreshPlayUrl(id, actor) {
   }
 
   const doc = await Recording.findById(id);
-  const zoomData = await fetchMeetingRecordings(doc.zoomMeetingId);
-  const file = zoomData.recording_files?.find((f) => f.id === doc.zoomRecordingId)
-    ?? zoomData.recording_files?.[0];
-
-  if (!file?.play_url) {
-    const err = new Error('Play URL not available from Zoom');
-    err.status = 502;
-    throw err;
-  }
+  const { zoomData, file } = await resolveRecordingFile(doc);
+  const passcode = resolveRecordingPasscode(zoomData, file);
 
   doc.playUrlFetchedAt = new Date();
   await doc.save();
@@ -164,10 +186,65 @@ export async function getFreshPlayUrl(id, actor) {
   }
 
   return {
-    playUrl: file.play_url,
+    playUrl: appendRecordingPasscode(file.play_url, passcode),
     downloadUrl: file.download_url ?? null,
+    passcode,
     expiresNote: 'This URL is time-limited. Fetch again if expired.',
   };
+}
+
+export async function streamRecordingDownload(id, actor, res) {
+  assertRegularAdmin(actor);
+  const recording = await getRecordingById(id, actor);
+  if (!recording) {
+    const err = new Error('Recording not found or access denied');
+    err.status = 404;
+    throw err;
+  }
+
+  const doc = await Recording.findById(id);
+  const { zoomData, file } = await resolveRecordingFile(doc);
+
+  if (!file.download_url) {
+    const err = new Error('Download URL not available from Zoom');
+    err.status = 502;
+    throw err;
+  }
+
+  const token = await getZoomAccessToken();
+  const downloadResponse = await fetch(file.download_url, {
+    headers: { Authorization: `Bearer ${token}` },
+    redirect: 'follow',
+  });
+
+  if (!downloadResponse.ok) {
+    const err = new Error('Failed to download recording from Zoom');
+    err.status = 502;
+    throw err;
+  }
+
+  const passcode = resolveRecordingPasscode(zoomData, file);
+  const safeTopic = String(recording.topic || 'recording')
+    .replace(/[^\w.-]+/g, '_')
+    .slice(0, 80);
+  const ext = String(file.file_extension || recording.fileType || 'mp4').toLowerCase();
+
+  res.setHeader('Content-Type', downloadResponse.headers.get('content-type') || 'video/mp4');
+  res.setHeader('Content-Disposition', `attachment; filename="${safeTopic}.${ext}"`);
+  if (passcode) {
+    res.setHeader('X-Recording-Passcode', passcode);
+  }
+
+  if (actor) {
+    await writeAuditLog({
+      actor,
+      action: 'recording_accessed',
+      meta: { recordingId: id, zoomRecordingId: doc.zoomRecordingId, download: true },
+    });
+  }
+
+  const buffer = Buffer.from(await downloadResponse.arrayBuffer());
+  res.send(buffer);
 }
 
 export async function deleteRecording(id, actor) {

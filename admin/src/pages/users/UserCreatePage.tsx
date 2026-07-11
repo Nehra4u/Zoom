@@ -16,12 +16,11 @@ export function UserCreatePage() {
   const queryClient = useQueryClient()
   const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => fetchUsers() })
   const atLimit = users.length >= MAX_USERS
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [phone, setPhone] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [zoomDisplayName, setZoomDisplayName] = useState('')
-  const [status, setStatus] = useState<UserStatus>('pending')
+  const [status, setStatus] = useState<UserStatus>('active')
 
   const mutation = useMutation({
     mutationFn: createUser,
@@ -36,11 +35,10 @@ export function UserCreatePage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     mutation.mutate({
-      name,
-      email,
+      username,
       phone: phone || undefined,
+      email: email || undefined,
       password,
-      zoomDisplayName: zoomDisplayName || name,
       status,
     })
   }
@@ -51,7 +49,7 @@ export function UserCreatePage() {
         <CardHeader>
           <CardTitle>Account details</CardTitle>
           <CardDescription>
-            Users must be active before they can join a meeting. Password must be at least 8 characters.{' '}
+            APK users log in with username and password only. Password must be at least 8 characters.{' '}
             {users.length} / {MAX_USERS} accounts used.
           </CardDescription>
         </CardHeader>
@@ -64,24 +62,13 @@ export function UserCreatePage() {
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">Full name</Label>
-              <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone (optional)</Label>
-              <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zoomDisplayName">Zoom display name</Label>
+              <Label htmlFor="username">Username</Label>
               <Input
-                id="zoomDisplayName"
-                value={zoomDisplayName}
-                onChange={(e) => setZoomDisplayName(e.target.value)}
-                placeholder={name || 'Shown in Zoom session'}
+                id="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+                autoComplete="off"
               />
             </div>
             <div className="space-y-2">
@@ -94,6 +81,14 @@ export function UserCreatePage() {
                 minLength={8}
                 required
               />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone (optional)</Label>
+              <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email (optional)</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Initial status</Label>

@@ -12,8 +12,9 @@ export interface UserDevice {
 
 export interface ApkUser {
   id: string
+  username: string
   name: string
-  email: string
+  email: string | null
   phone: string | null
   status: UserStatus
   zoomDisplayName: string
@@ -21,15 +22,8 @@ export interface ApkUser {
   createdAt: string
   updatedAt: string
   lastActiveAt: string | null
-  /** Most recent activity across login / socket heartbeats — falls back to lastActiveAt. */
   lastSeenAt: string | null
-  /** Most recently seen device session for this user, if any has connected. */
   device: UserDevice | null
-  /**
-   * True only while the user has a live, currently-connected websocket right now.
-   * This is distinct from `status === 'active'` ("Activated" — the account is eligible to
-   * use the app), which says nothing about whether the user is online this instant.
-   */
   isOnline: boolean
 }
 

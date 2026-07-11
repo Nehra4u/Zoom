@@ -5,16 +5,15 @@ const router = Router();
 
 router.post('/login', async (req, res) => {
   try {
-    const { email, password, device } = req.body;
-    if (!email || !password) {
+    const { username, password, device } = req.body;
+    if (!username || !password) {
       return res.status(400).json({
         success: false,
         status: 'VALIDATION_ERROR',
-        message: 'Email and password are required.',
+        message: 'Username and password are required.',
       });
     }
-    const result = await loginClient(email, password, device ?? {});
-    // Use 200 for all business-level results; only 4xx/5xx for infra errors
+    const result = await loginClient(username, password, device ?? {});
     res.json(result);
   } catch (err) {
     res.status(err.status || 500).json({

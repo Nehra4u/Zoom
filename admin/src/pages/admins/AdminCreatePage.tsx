@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { createAdmin } from '@/api/admins'
 import { getErrorMessage } from '@/api/client'
+import { ZoomHostUserField } from '@/components/ZoomHostUserField'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,8 +15,10 @@ export function AdminCreatePage() {
   const queryClient = useQueryClient()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'admin' | 'super_admin'>('admin')
+  const [zoomHostUserId, setZoomHostUserId] = useState('')
 
   const mutation = useMutation({
     mutationFn: createAdmin,
@@ -29,7 +32,14 @@ export function AdminCreatePage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    mutation.mutate({ name, email, password, role })
+    mutation.mutate({
+      name,
+      email: email || undefined,
+      phone: phone || undefined,
+      password,
+      role,
+      zoomHostUserId: zoomHostUserId.trim() || null,
+    })
   }
 
   return (
@@ -37,7 +47,7 @@ export function AdminCreatePage() {
       <Card>
         <CardHeader>
           <CardTitle>Account details</CardTitle>
-          <CardDescription>Password must be at least 8 characters</CardDescription>
+          <CardDescription>Name and password are required. Email and phone are optional.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -46,8 +56,12 @@ export function AdminCreatePage() {
               <Input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+              <Label htmlFor="email">Email (optional)</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone (optional)</Label>
+              <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -72,6 +86,13 @@ export function AdminCreatePage() {
                 <option value="super_admin">Super admin</option>
               </select>
             </div>
+            {role === 'admin' && (
+              <ZoomHostUserField
+                id="zoom-host"
+                value={zoomHostUserId}
+                onChange={setZoomHostUserId}
+              />
+            )}
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending ? 'Creating…' : 'Create admin'}

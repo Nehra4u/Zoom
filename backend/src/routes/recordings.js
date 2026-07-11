@@ -5,6 +5,7 @@ import {
   getFreshPlayUrl,
   getRecordingById,
   listRecordings,
+  streamRecordingDownload,
   syncRecordingsFromZoom,
 } from '../services/recordingService.js';
 
@@ -35,6 +36,14 @@ router.get('/:id/play-url', async (req, res) => {
   try {
     const result = await getFreshPlayUrl(req.params.id, req.admin);
     res.json(result);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
+router.get('/:id/download', async (req, res) => {
+  try {
+    await streamRecordingDownload(req.params.id, req.admin, res);
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });
   }

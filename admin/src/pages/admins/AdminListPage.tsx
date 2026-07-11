@@ -45,6 +45,8 @@ export function AdminListPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Zoom license</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -54,7 +56,17 @@ export function AdminListPage() {
                 {admins.map((admin) => (
                   <TableRow key={admin.id}>
                     <TableCell className="font-medium">{admin.name}</TableCell>
-                    <TableCell>{admin.email}</TableCell>
+                    <TableCell>{admin.email ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">{admin.phone ?? '—'}</TableCell>
+                    <TableCell>
+                      {admin.role === 'super_admin' ? (
+                        <span className="text-xs text-muted-foreground">N/A</span>
+                      ) : admin.zoomHostUserId ? (
+                        <Badge variant="success">Assigned</Badge>
+                      ) : (
+                        <Badge variant="warning">Not assigned</Badge>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary">{admin.role.replace('_', ' ')}</Badge>
                     </TableCell>
