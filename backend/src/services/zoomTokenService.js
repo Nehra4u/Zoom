@@ -65,7 +65,7 @@ export async function isSdkJtiRevoked(jti) {
   return Boolean(found);
 }
 
-export async function issueZoomCredentialsForUser(user, actor = null) {
+export async function issueZoomCredentialsForUser(user, actor = null, liveMeetingHint = null) {
   if (user.status !== 'active') {
     const err = new Error('User account is not active');
     err.status = 403;
@@ -83,16 +83,12 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
   const userId = user._id ?? user.id;
   const doc = await User.findById(userId);
 
-  if (!useMock) {
-    const { getLiveMeetingForAdmin } = await import('./meetingService.js');
-    const liveMeeting = await getLiveMeetingForAdmin(doc?.createdBy?.toString());
-    if (!liveMeeting) {
-      const err = new Error('No live meeting — wait for admin to start a session');
-      err.status = 404;
-      err.code = 'MEETING_ENDED';
-      throw err;
-    }
-    if (!isMockMode()) {
+  const { getLiveMeetingForAdmin } = await import('./meetingService.js');
+  const liveMeeting =
+    liveMeetingHint ?? (await getLiveMeetingForAdmin(doc?.createdBy?.toString()));
+
+  if (liveMeeting) {
+    if (!useMock && !isMockMode()) {
       const { syncMeetingEndIfStale } = await import('./meetingService.js');
       const ended = await syncMeetingEndIfStale(liveMeeting);
       if (ended) {
@@ -104,6 +100,11 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
     }
     meetingNumber = liveMeeting.meetingNumber;
     password = liveMeeting.password ?? '';
+  } else if (!useMock) {
+    const err = new Error('No live meeting — wait for admin to start a session');
+    err.status = 404;
+    err.code = 'MEETING_ENDED';
+    throw err;
   }
 
   if (doc?.lastSdkJti) {
@@ -132,6 +133,10 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
     password: password || '',
     jti,
   };
+
+  // #region agent log
+  fetch('http://127.0.0.1:7888/ingest/29879b66-38f4-4acd-a773-f8eca05bf505',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e9d75f'},body:JSON.stringify({sessionId:'e9d75f',runId:'jwt-mn-fix',hypothesisId:'H6',location:'zoomTokenService.js:issueZoomCredentialsForUser',message:'credentials issued',data:{meetingNumber:credentials.meetingNumber,useMock,hasLiveMeeting:Boolean(liveMeeting)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   return credentials;
 }

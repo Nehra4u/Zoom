@@ -40,7 +40,7 @@ export async function buildClientMeetingPayload(user, liveMeeting = null) {
   const meeting = liveMeeting ?? (await resolveLiveMeetingForUser(user));
   if (!meeting) return null;
 
-  const { sdkJwt, sdkKey } = await issueZoomCredentialsForUser(user);
+  const { sdkJwt, sdkKey } = await issueZoomCredentialsForUser(user, null, meeting);
   const meetingId = meeting.meetingNumber;
   const meetingPassword = meeting.password ?? '';
   const meetingHostUrl = meeting.joinUrl ?? `https://zoom.us/j/${meetingId}`;
