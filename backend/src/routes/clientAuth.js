@@ -11,7 +11,7 @@ router.post('/login', async (req, res) => {
       return res.status(400).json({
         success: false,
         status: 'VALIDATION_ERROR',
-        message: 'Username and password are required.',
+        message: 'Email or username and password are required.',
       });
     }
     const result = await loginClient(loginId, password, device ?? {});
