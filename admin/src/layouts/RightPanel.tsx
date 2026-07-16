@@ -100,7 +100,9 @@ export function RightPanel() {
                     <UserRound className="h-[18px] w-[18px] text-chart-1" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{user.username}</p>
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {user.username ?? user.name ?? user.email ?? 'Unknown user'}
+                    </p>
                     <p className="truncate text-xs text-muted-foreground">{user.phone || 'No phone on file'}</p>
                   </div>
                 </div>

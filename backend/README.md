@@ -59,7 +59,7 @@ docker compose up -d
   "success": true,
   "currentStatus": "SUCCESS | NO_MEETING_ASSIGNED | USER_INACTIVE | USER_DEACTIVATED",
   "user": { "uId", "name", "phone", "uStatus" },
-  "meeting": { "meetingId", "meetingPassword", "meetingHostUrl", "jwtToken" },
+  "meeting": { "meetingId", "meetingPassword", "meetingHostUrl", "sdkKey", "jwtToken" },
   "websocket": { "url": "ws(s)://host/client", "hbInterval": 10 }
 }
 ```

@@ -55,6 +55,7 @@ export function notifyRejoinAllowed(userId, credentials = {}) {
   }
 
   io.of('/client').to(clientRoom(userId)).emit('REJOIN_ALLOWED', {
+    sdkKey: credentials.sdkKey ?? process.env.ZOOM_SDK_KEY ?? null,
     meetingToken: credentials.sdkJwt ?? credentials.jwtToken ?? null,
     meetingNumber: credentials.meetingNumber ?? credentials.meetingId ?? null,
     password: credentials.password ?? credentials.meetingPassword ?? null,
@@ -74,6 +75,7 @@ export async function notifyUserActivated(userId, user) {
         meetingId: statusPayload.meetingId,
         meetingPassword: statusPayload.meetingPassword,
         meetingHostUrl: statusPayload.meetingHostUrl,
+        sdkKey: statusPayload.sdkKey ?? null,
         jwtToken: statusPayload.jwtToken,
       }
     : null;
@@ -88,6 +90,7 @@ export async function notifyUserActivated(userId, user) {
 
   if (meeting) {
     notifyRejoinAllowed(userId, {
+      sdkKey: meeting.sdkKey,
       sdkJwt: meeting.jwtToken,
       meetingNumber: meeting.meetingId,
       password: meeting.meetingPassword,

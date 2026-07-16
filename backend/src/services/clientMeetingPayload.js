@@ -49,6 +49,7 @@ export async function buildClientMeetingPayload(user, liveMeeting = null) {
     meetingId,
     meetingPassword,
     meetingHostUrl,
+    sdkKey: process.env.ZOOM_SDK_KEY ?? null,
     jwtToken: sdkJwt,
   };
 }

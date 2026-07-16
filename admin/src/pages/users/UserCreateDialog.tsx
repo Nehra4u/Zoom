@@ -31,11 +31,21 @@ export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogPro
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
+    const username = String(form.get('username') ?? '').trim()
+    const password = String(form.get('password') ?? '')
+    const phone = String(form.get('phone') ?? '').trim()
+    const email = String(form.get('email') ?? '').trim()
+
+    if (!username) {
+      toast.error('Username is required')
+      return
+    }
+
     mutation.mutate({
-      username: String(form.get('username') ?? ''),
-      password: String(form.get('password') ?? ''),
-      phone: String(form.get('phone') ?? '') || undefined,
-      email: String(form.get('email') ?? '') || undefined,
+      username,
+      password,
+      phone: phone || undefined,
+      email: email || undefined,
       status: 'active',
     })
   }

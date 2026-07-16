@@ -1,13 +1,38 @@
 import { useLocalRecordingStore } from '@/stores/localRecordingStore'
 
+export type LocalRecordingStartResult =
+  | { ok: true; hasAudio: boolean }
+  | { ok: false; reason: 'unsupported' | 'cancelled' | 'failed' }
+
+type CaptureConstraints = DisplayMediaStreamOptions & {
+  preferCurrentTab?: boolean
+  selfBrowserSurface?: 'include' | 'exclude'
+  systemAudio?: 'include' | 'exclude'
+}
+
 let mediaRecorder: MediaRecorder | null = null
-let captureStream: MediaStream | null = null
+let displayStream: MediaStream | null = null
+let recordingStream: MediaStream | null = null
+let micStream: MediaStream | null = null
+let audioContext: AudioContext | null = null
 let chunks: BlobPart[] = []
 let captureStarted = false
 
+function stopStream(stream: MediaStream | null) {
+  stream?.getTracks().forEach((track) => track.stop())
+}
+
 function stopTracks() {
-  captureStream?.getTracks().forEach((track) => track.stop())
-  captureStream = null
+  stopStream(recordingStream)
+  stopStream(displayStream)
+  stopStream(micStream)
+  recordingStream = null
+  displayStream = null
+  micStream = null
+  if (audioContext) {
+    void audioContext.close()
+    audioContext = null
+  }
 }
 
 function pickMimeType() {
@@ -15,42 +40,107 @@ function pickMimeType() {
   return candidates.find((type) => MediaRecorder.isTypeSupported(type)) ?? 'video/webm'
 }
 
-async function requestCaptureStream() {
+async function requestDisplayStream() {
+  const tabConstraints: CaptureConstraints = {
+    video: { displaySurface: 'browser' } as MediaTrackConstraints,
+    audio: {
+      suppressLocalAudioPlayback: false,
+    } as MediaTrackConstraints,
+    preferCurrentTab: true,
+    selfBrowserSurface: 'include',
+    systemAudio: 'include',
+  }
+
   try {
-    return await navigator.mediaDevices.getDisplayMedia({
-      video: { displaySurface: 'browser' } as MediaTrackConstraints,
-      audio: true,
-    })
+    return await navigator.mediaDevices.getDisplayMedia(tabConstraints)
   } catch {
     return navigator.mediaDevices.getDisplayMedia({
       video: true,
-      audio: true,
+      audio: {
+        suppressLocalAudioPlayback: false,
+      } as MediaTrackConstraints,
     })
   }
 }
 
-export async function startLocalRecordingCapture() {
-  if (captureStarted || typeof MediaRecorder === 'undefined') return
+async function requestMicStream() {
+  try {
+    return await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+      },
+      video: false,
+    })
+  } catch {
+    return null
+  }
+}
+
+async function buildRecordingStream(source: MediaStream) {
+  const videoTracks = source.getVideoTracks()
+  const displayAudioTracks = source.getAudioTracks()
+  micStream = await requestMicStream()
+  const micAudioTracks = micStream?.getAudioTracks() ?? []
+
+  const hasDisplayAudio = displayAudioTracks.some((track) => track.readyState === 'live')
+  const hasMicAudio = micAudioTracks.some((track) => track.readyState === 'live')
+
+  if (!hasDisplayAudio && !hasMicAudio) {
+    return new MediaStream(videoTracks)
+  }
+
+  if (hasDisplayAudio && !hasMicAudio) {
+    stopStream(micStream)
+    micStream = null
+    return new MediaStream([...videoTracks, ...displayAudioTracks])
+  }
+
+  if (!hasDisplayAudio && hasMicAudio) {
+    return new MediaStream([...videoTracks, ...micAudioTracks])
+  }
+
+  audioContext = new AudioContext()
+  const destination = audioContext.createMediaStreamDestination()
+  const displaySource = audioContext.createMediaStreamSource(new MediaStream(displayAudioTracks))
+  const micSource = audioContext.createMediaStreamSource(new MediaStream(micAudioTracks))
+  displaySource.connect(destination)
+  micSource.connect(destination)
+
+  return new MediaStream([...videoTracks, ...destination.stream.getAudioTracks()])
+}
+
+export async function startLocalRecordingCapture(): Promise<LocalRecordingStartResult> {
+  if (captureStarted || typeof MediaRecorder === 'undefined') {
+    return { ok: false, reason: 'unsupported' }
+  }
 
   try {
-    captureStream = await requestCaptureStream()
+    displayStream = await requestDisplayStream()
+    recordingStream = await buildRecordingStream(displayStream)
 
-    captureStream.getVideoTracks()[0]?.addEventListener('ended', () => {
+    displayStream.getVideoTracks()[0]?.addEventListener('ended', () => {
       void finalizeLocalRecordingCapture()
     })
 
+    const hasAudio = recordingStream.getAudioTracks().some((track) => track.readyState === 'live')
     const mimeType = pickMimeType()
     chunks = []
-    mediaRecorder = new MediaRecorder(captureStream, { mimeType })
+    mediaRecorder = new MediaRecorder(recordingStream, { mimeType })
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data)
     }
     mediaRecorder.start(1000)
     captureStarted = true
     useLocalRecordingStore.getState().setStatus('recording')
-  } catch {
+    return { ok: true, hasAudio }
+  } catch (err) {
     stopTracks()
     captureStarted = false
+    if (err instanceof DOMException && err.name === 'NotAllowedError') {
+      return { ok: false, reason: 'cancelled' }
+    }
+    return { ok: false, reason: 'failed' }
   }
 }
 

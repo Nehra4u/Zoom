@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Download, LoaderCircle } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -168,7 +169,21 @@ export function triggerLocalRecordingFinalize() {
 }
 
 export function triggerLocalRecordingStart() {
-  void import('@/lib/localRecordingCapture').then(({ startLocalRecordingCapture }) =>
-    startLocalRecordingCapture()
+  toast.info(
+    'To capture meeting audio, choose this browser tab and enable "Also share tab audio" / "Share tab audio".',
+    { duration: 10000 }
   )
+  void import('@/lib/localRecordingCapture').then(async ({ startLocalRecordingCapture }) => {
+    const result = await startLocalRecordingCapture()
+    if (!result.ok) {
+      if (result.reason === 'cancelled') return
+      toast.error('Could not start local recording capture')
+      return
+    }
+    if (!result.hasAudio) {
+      toast.warning(
+        'Recording started without audio. End the meeting, then rejoin and enable tab audio when Chrome prompts you.'
+      )
+    }
+  })
 }

@@ -56,7 +56,7 @@ export function UserDetailPage() {
 
   useEffect(() => {
     if (user) {
-      setUsername(user.username)
+      setUsername(user.username ?? user.email ?? '')
       setEmail(user.email ?? '')
       setPhone(user.phone ?? '')
     }

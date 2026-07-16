@@ -125,6 +125,7 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
   }
 
   return {
+    sdkKey: process.env.ZOOM_SDK_KEY ?? null,
     sdkJwt,
     meetingNumber: normalizeMeetingNumber(meetingNumber || '0000000000'),
     password: password || '',

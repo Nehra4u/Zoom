@@ -16,11 +16,20 @@ import { getOnlineUserIds } from '../socket/index.js';
 
 export const MAX_USERS = 300;
 
+function resolveUsername(user) {
+  return user.username ?? user.email ?? '';
+}
+
+function resolveDisplayName(user) {
+  return user.name ?? user.username ?? user.email ?? 'Unknown user';
+}
+
 function toPublicUser(user, deviceSession = null, onlineUserIds = null) {
+  const username = resolveUsername(user);
   return {
     id: user._id.toString(),
-    username: user.username,
-    name: user.name,
+    username,
+    name: resolveDisplayName(user),
     email: user.email ?? null,
     phone: user.phone ?? null,
     status: user.status,
@@ -106,16 +115,19 @@ export async function createUser({ username, phone, email, password, status, cre
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const user = await User.create({
+  const userDoc = {
     username: normalizedUsername,
     name: normalizedUsername,
-    email: email ? String(email).toLowerCase().trim() : null,
-    phone: phone || null,
     passwordHash,
     zoomDisplayName: normalizedUsername,
     status: status ?? 'active',
     createdBy: createdBy.sub,
-  });
+  };
+  const normalizedEmail = email ? String(email).toLowerCase().trim() : '';
+  if (normalizedEmail) userDoc.email = normalizedEmail;
+  if (phone) userDoc.phone = phone;
+
+  const user = await User.create(userDoc);
 
   await writeAuditLog({
     actor: createdBy,
@@ -159,12 +171,23 @@ export async function updateUser(id, updates, actor) {
   }
 
   if (updates.email !== undefined) {
-    user.email = updates.email ? String(updates.email).toLowerCase().trim() : null;
+    const normalizedEmail = updates.email ? String(updates.email).toLowerCase().trim() : '';
+    if (normalizedEmail) {
+      user.email = normalizedEmail;
+    } else {
+      user.email = undefined;
+    }
   }
 
   const phoneChanged =
     updates.phone !== undefined && (updates.phone || null) !== (user.phone || null);
-  if (updates.phone !== undefined) user.phone = updates.phone || null;
+  if (updates.phone !== undefined) {
+    if (updates.phone) {
+      user.phone = updates.phone;
+    } else {
+      user.phone = undefined;
+    }
+  }
   if (updates.zoomDisplayName !== undefined) user.zoomDisplayName = updates.zoomDisplayName;
   if (updates.status !== undefined) user.status = updates.status;
 

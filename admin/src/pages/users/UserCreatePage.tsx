@@ -34,10 +34,16 @@ export function UserCreatePage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const normalizedUsername = username.trim()
+    if (!normalizedUsername) {
+      toast.error('Username is required')
+      return
+    }
+
     mutation.mutate({
-      username,
-      phone: phone || undefined,
-      email: email || undefined,
+      username: normalizedUsername,
+      phone: phone.trim() || undefined,
+      email: email.trim() || undefined,
       password,
       status,
     })

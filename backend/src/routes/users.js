@@ -26,7 +26,13 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { username, phone, email, password, status } = req.body;
+    const username =
+      req.body.username != null ? String(req.body.username).trim() : '';
+    const password = req.body.password != null ? String(req.body.password) : '';
+    const phone = req.body.phone != null ? String(req.body.phone).trim() : undefined;
+    const email = req.body.email != null ? String(req.body.email).trim() : undefined;
+    const { status } = req.body;
+
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required' });
     }
@@ -35,8 +41,8 @@ router.post('/', async (req, res) => {
     }
     const user = await createUser({
       username,
-      phone,
-      email,
+      phone: phone || undefined,
+      email: email || undefined,
       password,
       status,
       createdBy: req.admin,

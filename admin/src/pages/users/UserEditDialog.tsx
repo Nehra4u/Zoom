@@ -74,10 +74,19 @@ export function UserEditDialog({ user, onClose }: UserEditDialogProps) {
   function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
+    const username = String(form.get('username') ?? '').trim()
+    const email = String(form.get('email') ?? '').trim()
+    const phone = String(form.get('phone') ?? '').trim()
+
+    if (!username) {
+      toast.error('Username is required')
+      return
+    }
+
     saveMutation.mutate({
-      username: String(form.get('username') ?? ''),
-      email: String(form.get('email') ?? ''),
-      phone: String(form.get('phone') ?? ''),
+      username,
+      email,
+      phone,
     })
   }
 

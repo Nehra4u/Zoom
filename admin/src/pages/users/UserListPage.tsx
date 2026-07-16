@@ -21,7 +21,12 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: 'logged_out', label: 'Logged Out' },
 ]
 
-function initials(name: string) {
+function displayUsername(user: ApkUser) {
+  return user.username ?? user.name ?? user.email ?? 'Unknown user'
+}
+
+function initials(name?: string | null) {
+  if (!name) return '?'
   return name
     .trim()
     .split(/\s+/)
@@ -70,8 +75,9 @@ export function UserListPage() {
       if (filter === 'logged_out' && !user.device?.loggedOut) return false
       if (filter !== 'all' && filter !== 'logged_out' && user.status !== filter) return false
       if (!q) return true
+      const username = displayUsername(user).toLowerCase()
       return (
-        user.username.toLowerCase().includes(q) ||
+        username.includes(q) ||
         (user.email ?? '').toLowerCase().includes(q) ||
         (user.phone ?? '').toLowerCase().includes(q)
       )
@@ -143,13 +149,13 @@ export function UserListPage() {
             const avatarBlock = (
               <div className={cn('flex min-w-0 items-center gap-4', isGreyedOut && 'opacity-60')}>
                 <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-chart-1/15 text-sm font-medium text-chart-1">
-                  {initials(user.username)}
+                  {initials(displayUsername(user))}
                   {user.isOnline && (
                     <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success" />
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate text-base font-bold text-foreground">{user.username}</p>
+                  <p className="truncate text-base font-bold text-foreground">{displayUsername(user)}</p>
                   <p className="truncate text-xs text-muted-foreground">{user.phone || 'No phone on file'}</p>
                 </div>
               </div>

@@ -4,8 +4,8 @@ const userSchema = new mongoose.Schema(
   {
     username: { type: String, required: true, unique: true, lowercase: true, trim: true },
     name: { type: String, required: true, trim: true },
-    email: { type: String, default: null, lowercase: true, trim: true },
-    phone: { type: String, default: null, trim: true },
+    email: { type: String, lowercase: true, trim: true },
+    phone: { type: String, trim: true },
     passwordHash: { type: String, required: true },
     status: {
       type: String,
@@ -26,5 +26,12 @@ const userSchema = new mongoose.Schema(
 
 userSchema.index({ status: 1 });
 userSchema.index({ createdBy: 1 });
+userSchema.index(
+  { email: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { email: { $type: 'string' } },
+  }
+);
 
 export const User = mongoose.model('User', userSchema);
