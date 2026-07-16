@@ -5,15 +5,16 @@ const router = Router();
 
 router.post('/login', async (req, res) => {
   try {
-    const { username, password, device } = req.body;
-    if (!username || !password) {
+    const loginId = req.body.username ?? req.body.email;
+    const { password, device } = req.body;
+    if (!loginId || !password) {
       return res.status(400).json({
         success: false,
         status: 'VALIDATION_ERROR',
         message: 'Username and password are required.',
       });
     }
-    const result = await loginClient(username, password, device ?? {});
+    const result = await loginClient(loginId, password, device ?? {});
     res.json(result);
   } catch (err) {
     res.status(err.status || 500).json({

@@ -40,18 +40,24 @@ export async function buildClientMeetingPayload(user, liveMeeting = null) {
   const meeting = liveMeeting ?? (await resolveLiveMeetingForUser(user));
   if (!meeting) return null;
 
-  const { sdkJwt } = await issueZoomCredentialsForUser(user);
+  const { sdkJwt, sdkKey } = await issueZoomCredentialsForUser(user);
   const meetingId = meeting.meetingNumber;
   const meetingPassword = meeting.password ?? '';
   const meetingHostUrl = meeting.joinUrl ?? `https://zoom.us/j/${meetingId}`;
 
-  return {
+  const payload = {
     meetingId,
     meetingPassword,
     meetingHostUrl,
-    sdkKey: process.env.ZOOM_SDK_KEY ?? null,
+    sdkKey: sdkKey ?? null,
     jwtToken: sdkJwt,
   };
+
+  // #region agent log
+  fetch('http://127.0.0.1:7888/ingest/29879b66-38f4-4acd-a773-f8eca05bf505',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e9d75f'},body:JSON.stringify({sessionId:'e9d75f',runId:'post-fix',hypothesisId:'H5',location:'clientMeetingPayload.js:buildClientMeetingPayload',message:'built meeting payload',data:{meetingId,hasSdkKey:Boolean(payload.sdkKey),hasJwtToken:Boolean(payload.jwtToken)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
+  return payload;
 }
 
 export async function buildClientStatusPayload(user) {
@@ -125,6 +131,10 @@ export async function buildHomeResponse(user, deviceId = null) {
 
   const websocket = { url: getClientWebsocketUrl(), hbInterval: HB_INTERVAL };
   const meeting = await buildClientMeetingPayload(user);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7888/ingest/29879b66-38f4-4acd-a773-f8eca05bf505',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e9d75f'},body:JSON.stringify({sessionId:'e9d75f',runId:'post-fix',hypothesisId:'H4',location:'clientMeetingPayload.js:buildHomeResponse',message:'home response branch',data:{userId:user._id?.toString(),hasMeeting:Boolean(meeting),meetingHasSdkKey:Boolean(meeting?.sdkKey),adminId:user.createdBy?.toString()},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   if (!meeting) {
     return {

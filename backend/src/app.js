@@ -47,6 +47,8 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     service: 'zoomcontrol-backend',
     reconciliation: getReconciliationStatus(),
+    zoomSdkConfigured: Boolean(process.env.ZOOM_SDK_KEY && process.env.ZOOM_SDK_SECRET),
+    apkSdkKeyEnabled: Boolean(process.env.ZOOM_SDK_KEY),
   });
 });
 

@@ -26,11 +26,14 @@ function toPublicClient(user) {
 const MAX_FAILED = 5;
 const LOCKOUT_MINUTES = 5;
 
-export async function loginClient(username, password, device = {}) {
+export async function loginClient(loginId, password, device = {}) {
   const { deviceId, deviceModel, manufacturer, androidVersion, appVersion } = device;
 
-  const normalizedUsername = String(username ?? '').toLowerCase().trim();
-  const user = await User.findOne({ username: normalizedUsername, status: { $ne: 'deleted' } });
+  const normalizedLoginId = String(loginId ?? '').toLowerCase().trim();
+  let user = await User.findOne({ username: normalizedLoginId, status: { $ne: 'deleted' } });
+  if (!user) {
+    user = await User.findOne({ email: normalizedLoginId, status: { $ne: 'deleted' } });
+  }
 
   if (!user) {
     return { success: false, status: 'INVALID_CREDENTIALS', message: 'Invalid username or password.' };

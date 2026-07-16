@@ -20,6 +20,7 @@ export function generateZoomSdkJwt(meetingNumber, role = 0) {
         token: `mock-sdk-jwt.${jti}`,
         jti,
         expiresAt: new Date(Date.now() + SDK_TTL_SEC * 1000),
+        sdkKey: sdkKey ?? null,
       };
     }
     const err = new Error('Zoom SDK credentials are not configured');
@@ -46,7 +47,7 @@ export function generateZoomSdkJwt(meetingNumber, role = 0) {
   };
 
   const token = jwt.sign(payload, sdkSecret);
-  return { token, jti, expiresAt: new Date(exp * 1000) };
+  return { token, jti, expiresAt: new Date(exp * 1000), sdkKey };
 }
 
 export async function revokeUserSdkToken(userId, jti, expiresAt) {
@@ -109,7 +110,7 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
     await revokeUserSdkToken(userId, doc.lastSdkJti, doc.lastSdkJtiExpiresAt);
   }
 
-  const { token: sdkJwt, jti, expiresAt } = generateZoomSdkJwt(meetingNumber || '0000000000');
+  const { token: sdkJwt, jti, expiresAt, sdkKey } = generateZoomSdkJwt(meetingNumber || '0000000000');
   await User.findByIdAndUpdate(userId, {
     lastSdkJti: jti,
     lastSdkJtiExpiresAt: expiresAt,
@@ -124,13 +125,19 @@ export async function issueZoomCredentialsForUser(user, actor = null) {
     });
   }
 
-  return {
-    sdkKey: process.env.ZOOM_SDK_KEY ?? null,
+  const credentials = {
+    sdkKey: sdkKey ?? null,
     sdkJwt,
     meetingNumber: normalizeMeetingNumber(meetingNumber || '0000000000'),
     password: password || '',
     jti,
   };
+
+  // #region agent log
+  fetch('http://127.0.0.1:7888/ingest/29879b66-38f4-4acd-a773-f8eca05bf505',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e9d75f'},body:JSON.stringify({sessionId:'e9d75f',runId:'post-fix',hypothesisId:'H5',location:'zoomTokenService.js:issueZoomCredentialsForUser',message:'issued zoom credentials',data:{hasSdkKey:Boolean(credentials.sdkKey),hasSdkJwt:Boolean(credentials.sdkJwt),meetingNumber:credentials.meetingNumber,useMock},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
+  return credentials;
 }
 
 export async function revokeOutstandingUserToken(user, actor = null) {
