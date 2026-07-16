@@ -134,10 +134,6 @@ export async function issueZoomCredentialsForUser(user, actor = null, liveMeetin
     jti,
   };
 
-  // #region agent log
-  fetch('http://127.0.0.1:7888/ingest/29879b66-38f4-4acd-a773-f8eca05bf505',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e9d75f'},body:JSON.stringify({sessionId:'e9d75f',runId:'jwt-mn-fix',hypothesisId:'H6',location:'zoomTokenService.js:issueZoomCredentialsForUser',message:'credentials issued',data:{meetingNumber:credentials.meetingNumber,useMock,hasLiveMeeting:Boolean(liveMeeting)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   return credentials;
 }
 
