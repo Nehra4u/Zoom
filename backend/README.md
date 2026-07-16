@@ -92,3 +92,8 @@ npm run zoom:check    # verify Zoom OAuth + print webhook URL
 - Full E2E (spec flows 27 & 28): `npm run test:e2e`
 - WebSocket load test: `CLIENTS=20 npm run test:ws-load`
 - WebSocket client lifecycle: `npm run test:ws-client`
+- Production SDK key audit: `npm run audit:prod-sdkkey`
+
+## Deploy to Render
+
+See [docs/DEPLOY_RENDER.md](docs/DEPLOY_RENDER.md). Production must have `ZOOM_SDK_KEY` set or APK clients receive `sdkKey: null`.

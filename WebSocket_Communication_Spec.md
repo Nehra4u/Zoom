@@ -15,9 +15,12 @@ Auth: `socket.handshake.auth.token` (client JWT).
   "meetingId": "87654321012",
   "meetingPassword": "aB12cd",
   "meetingHostUrl": "https://zoom.us/j/87654321012",
+  "sdkKey": "your_zoom_sdk_key",
   "jwtToken": "eyJhbGciOi..."
 }
 ```
+
+> Initialize Zoom SDK with `sdkKey`. Pass `jwtToken` as join signature. Backend never sends `ZOOM_SDK_SECRET`.
 
 ### `USER_ACTIVATED`
 - **Trigger:** admin activates the user's account
@@ -28,6 +31,7 @@ Auth: `socket.handshake.auth.token` (client JWT).
   "meetingId": "87654321012",
   "meetingPassword": "aB12cd",
   "meetingHostUrl": "https://zoom.us/j/87654321012",
+  "sdkKey": "your_zoom_sdk_key",
   "jwtToken": "eyJhbGciOi..."
 }
 ```
@@ -61,10 +65,24 @@ Auth: `socket.handshake.auth.token` (client JWT).
   "meetingId": "87654321012",
   "meetingPassword": "aB12cd",
   "meetingHostUrl": "https://zoom.us/j/87654321012",
+  "sdkKey": "your_zoom_sdk_key",
   "jwtToken": "eyJhbGciOi..."
 }
 ```
 Meeting fields are omitted (or `null`) when `shouldBeInMeeting` is `false`.
+
+### `REJOIN_ALLOWED` (legacy)
+
+Still emitted on some backends when user is re-activated:
+
+```json
+{
+  "sdkKey": "your_zoom_sdk_key",
+  "meetingToken": "eyJhbGciOi...",
+  "meetingNumber": "87654321012",
+  "password": "aB12cd"
+}
+```
 
 ---
 
@@ -84,8 +102,7 @@ Meeting fields are omitted (or `null`) when `shouldBeInMeeting` is `false`.
 
 ## Removed from the previous version
 
-- **`REJOIN_ALLOWED`** — merged into `SESSION_STARTED` (send it again instead of a separate event).
-- **`FORCE_LEAVE`** — not required.
+- **`FORCE_LEAVE`** — legacy only; handle for safety.
 - **`MEETING_UPDATED`** — not required.
 - **`session:ended`** — renamed to `SESSION_ENDED` for naming consistency with the other events, and no longer needs a payload.
 - **`HEARTBEAT_ACK`** — unchanged from the previous version, not covered above since no changes were requested to it.

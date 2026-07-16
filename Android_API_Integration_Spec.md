@@ -130,6 +130,7 @@ Requires `Authorization: Bearer <accessToken>`.
     "meetingId": "87654321012",
     "meetingPassword": "aB12cd",
     "meetingHostUrl": "https://zoom.us/j/87654321012",
+    "sdkKey": "your_zoom_sdk_key",
     "jwtToken": "eyJhbGciOi..."
   },
   "websocket": { "url": "wss://api.yourdomain.com/client", "hbInterval": 10 }
@@ -139,6 +140,63 @@ Requires `Authorization: Bearer <accessToken>`.
 **Response — no active meeting:** same shape, `"currentStatus": "NO_MEETING_ASSIGNED"`, `"meeting": null`.
 
 **Other `currentStatus` values:** `USER_INACTIVE`, `USER_DEACTIVATED`, `NOT_FOUND` — all return `"success": false, "user": null, "meeting": null, "websocket": null`.
+
+**Meeting fields:**
+
+| Field | Purpose |
+|-------|---------|
+| `sdkKey` | Zoom Meeting SDK app key — initialize SDK with this (safe to expose) |
+| `jwtToken` | Server-signed Zoom SDK JWT (~2h) — pass as join signature |
+| `meetingId` | Zoom meeting number |
+| `meetingPassword` | Meeting password |
+| `meetingHostUrl` | Zoom join URL |
+
+> **Security:** Backend never sends `ZOOM_SDK_SECRET`. Join auth is `sdkKey` + `jwtToken` only.
+
+---
+
+## 5. POST /token/zoom
+
+Requires `Authorization: Bearer <accessToken>` and header `X-Client-Platform: android`.
+
+Fallback when `jwtToken` from `/api/home` or WebSocket has expired.
+
+**Response — success**
+```json
+{
+  "sdkKey": "your_zoom_sdk_key",
+  "sdkJwt": "eyJhbGciOi...",
+  "meetingNumber": "87654321012",
+  "password": "aB12cd",
+  "jti": "uuid-of-this-token"
+}
+```
+
+**Errors:** `401` token expired, `403` wrong platform or deactivated, `404`/`503` no live meeting.
+
+---
+
+## Retrofit data classes
+
+```kotlin
+data class MeetingInfo(
+    val meetingId: String,
+    val meetingPassword: String,
+    val meetingHostUrl: String,
+    val sdkKey: String?,
+    val jwtToken: String,
+)
+
+data class ZoomTokenResponse(
+    val sdkKey: String?,
+    val sdkJwt: String,
+    val meetingNumber: String,
+    val password: String,
+    val jti: String,
+)
+```
+
+Reference Kotlin join helper: `docs/android/ZoomMeetingJoinHelper.kt`
 
 ---
 
@@ -152,3 +210,4 @@ The app also needs a persistent Socket.IO connection to `/client` for real-time 
 
 - **Error shape is not consistent.** `login`, `logout`, `profile`, `home` return `{ success: false, status, message }` with HTTP 200 for business-logic failures (check `success`/`status` in the body). Keep this in mind if any other client endpoint is added later that follows a different pattern (e.g. plain `{ error: "..." }` with a real 4xx/5xx).
 - **Device conflict:** `login` and `/home`'s underlying logic both care about single-device enforcement via `deviceId`. Make sure the same `deviceId` is sent consistently across `login`, `logout`, and (per the WebSocket spec) `HEARTBEAT`.
+- **Zoom SDK:** Initialize with `meeting.sdkKey` from `/api/home` or socket events. Join with `jwtToken` as signature. Never hardcode `ZOOM_SDK_SECRET` in the APK.

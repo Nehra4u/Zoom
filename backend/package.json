@@ -11,6 +11,7 @@
     "test:e2e": "node scripts/e2e-full.js",
     "test:ws-load": "node scripts/ws-load-test.js",
     "test:ws-client": "node scripts/e2e-ws-client.js",
+    "audit:prod-sdkkey": "node scripts/prod-sdkkey-audit.js",
     "test:ws-admin": "node scripts/e2e-admin-ws.js",
     "test:mongo": "node scripts/test-mongo.js",
     "zoom:check": "node scripts/zoom-setup-check.js"
