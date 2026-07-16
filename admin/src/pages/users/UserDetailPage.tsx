@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { resolveUsername } from '@/lib/userDisplay'
 import type { UserStatus } from '@/types/user'
 
 function statusVariant(status: UserStatus) {
@@ -56,7 +57,7 @@ export function UserDetailPage() {
 
   useEffect(() => {
     if (user) {
-      setUsername(user.username ?? user.email ?? '')
+      setUsername(resolveUsername(user))
       setEmail(user.email ?? '')
       setPhone(user.phone ?? '')
     }
@@ -120,6 +121,12 @@ export function UserDetailPage() {
 
   function handleUpdate(e: React.FormEvent) {
     e.preventDefault()
+    const normalizedUsername = username.trim()
+    if (!normalizedUsername) {
+      toast.error('Username is required')
+      return
+    }
+    setUsername(normalizedUsername)
     updateMutation.mutate()
   }
 
@@ -129,7 +136,7 @@ export function UserDetailPage() {
         <Link to="/users" className="text-sm text-muted-foreground hover:text-foreground">
           ← Back to users
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{user.username}</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{resolveUsername(user)}</h1>
         <div className="mt-2 flex gap-2">
           <Badge variant={statusVariant(user.status)}>{statusLabel(user.status)}</Badge>
           {user.lastActiveAt && (
@@ -219,7 +226,7 @@ export function UserDetailPage() {
               <DialogHeader>
                 <DialogTitle>Delete user?</DialogTitle>
                 <DialogDescription>
-                  This will soft-delete {user.username}&apos;s account. They will no longer be able to log in or join
+                  This will soft-delete {resolveUsername(user)}&apos;s account. They will no longer be able to log in or join
                   meetings.
                 </DialogDescription>
               </DialogHeader>

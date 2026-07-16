@@ -1,4 +1,4 @@
-import type { FormEvent } from 'react'
+import { useRef, type FormEvent } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { createUser } from '@/api/users'
@@ -17,6 +17,7 @@ interface UserCreateDialogProps {
 
 export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogProps) {
   const queryClient = useQueryClient()
+  const formRef = useRef<HTMLFormElement>(null)
 
   const mutation = useMutation({
     mutationFn: createUser,
@@ -40,18 +41,29 @@ export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogPro
       toast.error('Username is required')
       return
     }
+    if (!email) {
+      toast.error('Email is required')
+      return
+    }
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters')
+      return
+    }
 
     mutation.mutate({
       username,
       password,
       phone: phone || undefined,
-      email: email || undefined,
+      email,
       status: 'active',
     })
   }
 
   function handleOpenChange(next: boolean) {
-    if (!next) onClose()
+    if (!next) {
+      formRef.current?.reset()
+      onClose()
+    }
   }
 
   return (
@@ -60,7 +72,7 @@ export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogPro
         <DialogHeader>
           <DialogTitle>Add user</DialogTitle>
           <DialogDescription>
-            Create a new APK client account. Username must be unique. Password must be at least 8 characters.
+            Create a new APK client account. Username and email must be unique. Password must be at least 8 characters.
           </DialogDescription>
         </DialogHeader>
 
@@ -70,7 +82,7 @@ export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogPro
             existing user to free up a slot.
           </p>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="create-username">Username</Label>
               <Input id="create-username" name="username" required autoComplete="off" />
@@ -84,8 +96,8 @@ export function UserCreateDialog({ open, onClose, atLimit }: UserCreateDialogPro
               <Input id="create-phone" name="phone" type="tel" />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="create-email">Email (optional)</Label>
-              <Input id="create-email" name="email" type="email" />
+              <Label htmlFor="create-email">Email</Label>
+              <Input id="create-email" name="email" type="email" required />
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={onClose}>

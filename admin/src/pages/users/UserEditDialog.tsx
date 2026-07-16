@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
+import { resolveUsername } from '@/lib/userDisplay'
 import type { ApkUser, UserStatus } from '@/types/user'
 
 function statusVariant(status: UserStatus) {
@@ -97,7 +98,7 @@ export function UserEditDialog({ user, onClose }: UserEditDialogProps) {
           <>
             <DialogHeader>
               <DialogTitle>Edit profile</DialogTitle>
-              <DialogDescription>Update account details for {user.username}.</DialogDescription>
+              <DialogDescription>Update account details for {resolveUsername(user)}.</DialogDescription>
             </DialogHeader>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -106,10 +107,10 @@ export function UserEditDialog({ user, onClose }: UserEditDialogProps) {
               <span className="text-xs text-muted-foreground">Last seen: {formatDateTime(user.lastSeenAt)}</span>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form key={user.id} onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="edit-username">Username</Label>
-                <Input id="edit-username" name="username" defaultValue={user.username} required autoComplete="off" />
+                <Input id="edit-username" name="username" defaultValue={resolveUsername(user)} required autoComplete="off" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="edit-email">Email (optional)</Label>

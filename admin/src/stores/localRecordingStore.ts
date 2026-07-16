@@ -1,6 +1,13 @@
 import { create } from 'zustand'
+import { useSessionStore } from '@/stores/sessionStore'
 
-export type LocalRecordingStatus = 'idle' | 'recording' | 'finalizing' | 'ready' | 'dismissed'
+export type LocalRecordingStatus =
+  | 'idle'
+  | 'recording'
+  | 'interrupted'
+  | 'finalizing'
+  | 'ready'
+  | 'dismissed'
 
 interface LocalRecordingState {
   status: LocalRecordingStatus
@@ -48,5 +55,10 @@ export const useLocalRecordingStore = create<LocalRecordingState>((set, get) => 
 
 export function shouldBlockNavigation() {
   const { status, downloaded } = useLocalRecordingStore.getState()
-  return status === 'finalizing' || (status === 'ready' && !downloaded)
+  const meetingLive = useSessionStore.getState().meetingLive
+  return (
+    status === 'finalizing' ||
+    (status === 'ready' && !downloaded) ||
+    (status === 'interrupted' && meetingLive)
+  )
 }

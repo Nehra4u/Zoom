@@ -5,6 +5,7 @@ import { fetchUsers } from '@/api/users'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useSessionStore } from '@/stores/sessionStore'
+import { resolveUsername } from '@/lib/userDisplay'
 import { MAX_USERS } from '@/types/user'
 import type { ApkUser } from '@/types/user'
 import { UserCreateDialog } from './UserCreateDialog'
@@ -22,7 +23,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 ]
 
 function displayUsername(user: ApkUser) {
-  return user.username ?? user.name ?? user.email ?? 'Unknown user'
+  return resolveUsername(user) || 'Unknown user'
 }
 
 function initials(name?: string | null) {

@@ -173,7 +173,7 @@ export function DashboardPage() {
                 {startMutation.isPending ? 'Starting meeting…' : 'Start New Meeting'}
               </p>
               <p className="mt-1 text-center text-xs leading-5 text-muted-foreground">
-                Choose portal or Zoom app, then launch
+                Choose Start in Portal or Start in Zoom, then launch
               </p>
             </div>
           </div>

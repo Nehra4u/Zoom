@@ -1,4 +1,5 @@
 import { useLocalRecordingStore } from '@/stores/localRecordingStore'
+import { useSessionStore } from '@/stores/sessionStore'
 
 export type LocalRecordingStartResult =
   | { ok: true; hasAudio: boolean }
@@ -110,8 +111,44 @@ async function buildRecordingStream(source: MediaStream) {
   return new MediaStream([...videoTracks, ...destination.stream.getAudioTracks()])
 }
 
+async function stopActiveRecorder() {
+  const recorder = mediaRecorder
+  mediaRecorder = null
+  captureStarted = false
+
+  await new Promise<void>((resolve) => {
+    if (!recorder || recorder.state === 'inactive') {
+      resolve()
+      return
+    }
+    recorder.onstop = () => resolve()
+    recorder.stop()
+  })
+}
+
+async function handleSharingStopped() {
+  const store = useLocalRecordingStore.getState()
+  const status = store.status
+  if (status === 'finalizing' || status === 'ready' || status === 'interrupted') return
+  if (!captureStarted && status !== 'recording') return
+
+  await stopActiveRecorder()
+  stopTracks()
+
+  if (useSessionStore.getState().meetingLive) {
+    store.setStatus('interrupted')
+    return
+  }
+
+  await finalizeLocalRecordingCapture()
+}
+
 export async function startLocalRecordingCapture(): Promise<LocalRecordingStartResult> {
+  const storeStatus = useLocalRecordingStore.getState().status
   if (captureStarted || typeof MediaRecorder === 'undefined') {
+    return { ok: false, reason: 'unsupported' }
+  }
+  if (storeStatus !== 'idle' && storeStatus !== 'interrupted') {
     return { ok: false, reason: 'unsupported' }
   }
 
@@ -120,12 +157,14 @@ export async function startLocalRecordingCapture(): Promise<LocalRecordingStartR
     recordingStream = await buildRecordingStream(displayStream)
 
     displayStream.getVideoTracks()[0]?.addEventListener('ended', () => {
-      void finalizeLocalRecordingCapture()
+      void handleSharingStopped()
     })
 
     const hasAudio = recordingStream.getAudioTracks().some((track) => track.readyState === 'live')
     const mimeType = pickMimeType()
-    chunks = []
+    if (storeStatus === 'idle') {
+      chunks = []
+    }
     mediaRecorder = new MediaRecorder(recordingStream, { mimeType })
     mediaRecorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunks.push(event.data)
@@ -144,28 +183,25 @@ export async function startLocalRecordingCapture(): Promise<LocalRecordingStartR
   }
 }
 
-export async function finalizeLocalRecordingCapture() {
-  if (!captureStarted && useLocalRecordingStore.getState().status !== 'recording') return
-
+export async function restartLocalRecordingCapture(): Promise<LocalRecordingStartResult> {
   const store = useLocalRecordingStore.getState()
-  if (store.status === 'finalizing' || store.status === 'ready') return
+  if (store.status !== 'interrupted') {
+    return { ok: false, reason: 'unsupported' }
+  }
+  return startLocalRecordingCapture()
+}
+
+export async function finalizeLocalRecordingCapture() {
+  const store = useLocalRecordingStore.getState()
+  const status = store.status
+
+  if (status === 'finalizing' || status === 'ready') return
+  if (!captureStarted && status !== 'recording' && status !== 'interrupted') return
 
   store.setStatus('finalizing')
   store.setProgress(10)
 
-  const recorder = mediaRecorder
-  mediaRecorder = null
-  captureStarted = false
-
-  await new Promise<void>((resolve) => {
-    if (!recorder || recorder.state === 'inactive') {
-      resolve()
-      return
-    }
-    recorder.onstop = () => resolve()
-    recorder.stop()
-  })
-
+  await stopActiveRecorder()
   store.setProgress(45)
   stopTracks()
 
@@ -191,11 +227,8 @@ export async function finalizeLocalRecordingCapture() {
 }
 
 export function cancelLocalRecordingCapture() {
-  if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-    mediaRecorder.stop()
-  }
-  mediaRecorder = null
+  void stopActiveRecorder()
   chunks = []
-  captureStarted = false
   stopTracks()
+  useLocalRecordingStore.getState().reset()
 }

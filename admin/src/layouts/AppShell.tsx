@@ -26,6 +26,7 @@ import { EndMeetingButton } from '@/components/EndMeetingButton'
 import { MeetingPortalHost } from '@/components/MeetingPortalHost'
 import { TabSessionBlocker } from '@/components/TabSessionBlocker'
 import { LocalRecordingDialog, useLocalRecordingLifecycle } from '@/components/LocalRecordingDialog'
+import { RecordingInterruptedBanner, RestartRecordingButton } from '@/components/RecordingInterruptedBanner'
 import { DesktopMeetingEndedDialog } from '@/components/DesktopMeetingEndedDialog'
 import { RightPanel } from '@/layouts/RightPanel'
 import { useSessionStore } from '@/stores/sessionStore'
@@ -371,7 +372,10 @@ export function AppShell() {
               </button>
             )}
             {showMeetingUi && canEndMeeting && (
-              <EndMeetingButton variant="outline" size="sm" />
+              <>
+                <RestartRecordingButton />
+                <EndMeetingButton variant="outline" size="sm" />
+              </>
             )}
             <button
               type="button"
@@ -393,6 +397,7 @@ export function AppShell() {
             </button>
           </div>
         </header>
+        <RecordingInterruptedBanner />
         <div className="relative flex-1 overflow-hidden">
           <div className="pointer-events-none absolute left-[8%] top-[5%] h-72 w-72 rounded-full bg-blue-300/15 blur-3xl" />
           <div className="pointer-events-none absolute bottom-[4%] right-[10%] h-80 w-80 rounded-full bg-violet-300/15 blur-3xl" />

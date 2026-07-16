@@ -195,6 +195,16 @@
             success: function () {
               joinInFlight = false
               statusEl.style.display = 'none'
+              if (typeof ZoomMtg.mute === 'function') {
+                ZoomMtg.getCurrentUser({
+                  success: function (res) {
+                    var userId = res.result && res.result.currentUser && res.result.currentUser.userId
+                    if (userId != null) {
+                      ZoomMtg.mute({ userId: userId, mute: true, video: true })
+                    }
+                  },
+                })
+              }
               window.parent.postMessage({ type: 'ZOOM_JOINED' }, window.location.origin)
             },
             error: function (err) {

@@ -35,15 +35,24 @@ export function UserCreatePage() {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const normalizedUsername = username.trim()
+    const normalizedEmail = email.trim()
     if (!normalizedUsername) {
       toast.error('Username is required')
+      return
+    }
+    if (!normalizedEmail) {
+      toast.error('Email is required')
+      return
+    }
+    if (password.length < 8) {
+      toast.error('Password must be at least 8 characters')
       return
     }
 
     mutation.mutate({
       username: normalizedUsername,
       phone: phone.trim() || undefined,
-      email: email.trim() || undefined,
+      email: normalizedEmail,
       password,
       status,
     })
@@ -55,7 +64,7 @@ export function UserCreatePage() {
         <CardHeader>
           <CardTitle>Account details</CardTitle>
           <CardDescription>
-            APK users log in with username and password only. Password must be at least 8 characters.{' '}
+            APK users log in with username and password. Email is required for account setup. Password must be at least 8 characters.{' '}
             {users.length} / {MAX_USERS} accounts used.
           </CardDescription>
         </CardHeader>
@@ -93,8 +102,8 @@ export function UserCreatePage() {
               <Input id="phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">Email (optional)</Label>
-              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <Label htmlFor="email">Email</Label>
+              <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="status">Initial status</Label>

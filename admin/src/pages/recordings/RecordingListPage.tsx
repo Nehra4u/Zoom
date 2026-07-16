@@ -333,7 +333,7 @@ export function RecordingListPage() {
                 {recordingRetentionDays
                   ? ` Recordings are kept for ${recordingRetentionDays} day${recordingRetentionDays === 1 ? '' : 's'}.`
                   : null}
-                {isSyncing && recordings.length === 0 ? (
+                {isSyncing ? (
                   <span className="ml-2 text-foreground/80">Syncing from Zoom…</span>
                 ) : null}
               </CardDescription>
@@ -349,7 +349,14 @@ export function RecordingListPage() {
             {isSyncing ? 'Syncing…' : 'Sync from Zoom'}
           </Button>
         </CardHeader>
-        <CardContent>
+        <CardContent className="relative">
+          {isSyncing && !isLoading && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-lg bg-background/75 backdrop-blur-[2px]">
+              <LoaderCircle className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-sm font-medium text-foreground">Syncing recordings from Zoom…</p>
+              <Progress value={35} indeterminate className="w-48" />
+            </div>
+          )}
           {isLoading ? (
             <RecordingsTableSkeleton />
           ) : recordings.length === 0 ? (
@@ -366,6 +373,8 @@ export function RecordingListPage() {
                 </>
               )}
             </div>
+          ) : isSyncing ? (
+            <RecordingsTableSkeleton rows={Math.min(recordings.length, 6)} />
           ) : (
             <Table>
               <TableHeader>

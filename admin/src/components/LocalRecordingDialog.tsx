@@ -20,26 +20,25 @@ export function LocalRecordingDialog() {
   const progress = useLocalRecordingStore((s) => s.progress)
   const blobUrl = useLocalRecordingStore((s) => s.blobUrl)
   const fileName = useLocalRecordingStore((s) => s.fileName)
-  const downloaded = useLocalRecordingStore((s) => s.downloaded)
   const showLeaveWarning = useLocalRecordingStore((s) => s.showLeaveWarning)
-  const setDownloaded = useLocalRecordingStore((s) => s.setDownloaded)
   const setShowLeaveWarning = useLocalRecordingStore((s) => s.setShowLeaveWarning)
   const dismiss = useLocalRecordingStore((s) => s.dismiss)
   const autoDownloadAttempted = useRef(false)
 
   const isOpen = status === 'finalizing' || status === 'ready'
 
-  function handleDownload() {
+  function downloadAndDismiss() {
     if (!blobUrl || !fileName) return
     const anchor = document.createElement('a')
     anchor.href = blobUrl
     anchor.download = fileName
     anchor.click()
-    setDownloaded(true)
+    toast.success('Recording downloaded')
+    dismiss()
   }
 
   useEffect(() => {
-    if (status !== 'ready' || !blobUrl || !fileName || downloaded || autoDownloadAttempted.current) {
+    if (status !== 'ready' || !blobUrl || !fileName || autoDownloadAttempted.current) {
       return
     }
     autoDownloadAttempted.current = true
@@ -47,18 +46,15 @@ export function LocalRecordingDialog() {
     anchor.href = blobUrl
     anchor.download = fileName
     anchor.click()
-    setDownloaded(true)
-  }, [status, blobUrl, fileName, downloaded, setDownloaded])
+    toast.success('Recording downloaded')
+    dismiss()
+  }, [status, blobUrl, fileName, dismiss])
 
   useEffect(() => {
     if (status === 'idle') {
       autoDownloadAttempted.current = false
     }
   }, [status])
-
-  function handleDismiss() {
-    dismiss()
-  }
 
   function handleStay() {
     setShowLeaveWarning(false)
@@ -90,9 +86,7 @@ export function LocalRecordingDialog() {
             <DialogDescription>
               {status === 'finalizing'
                 ? 'Your local meeting recording is being prepared.'
-                : downloaded
-                  ? 'Your recording has been downloaded. You can download it again or dismiss this dialog.'
-                  : 'Download your local recording before leaving this page.'}
+                : 'Your recording is ready. Click download to save the file.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -107,21 +101,11 @@ export function LocalRecordingDialog() {
               <>
                 <Progress value={100} />
                 <div className="flex flex-wrap justify-end gap-2">
-                  <Button onClick={handleDownload} className="gap-2">
+                  <Button onClick={downloadAndDismiss} className="gap-2">
                     <Download className="h-4 w-4" />
                     Download recording
                   </Button>
-                  {downloaded && (
-                    <Button variant="outline" onClick={handleDismiss}>
-                      Dismiss
-                    </Button>
-                  )}
                 </div>
-                {!downloaded && (
-                  <p className="text-xs text-muted-foreground">
-                    You will lose this recording if you close the page before downloading.
-                  </p>
-                )}
               </>
             )}
           </div>
@@ -131,9 +115,13 @@ export function LocalRecordingDialog() {
       <Dialog open={showLeaveWarning} onOpenChange={setShowLeaveWarning}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Leave before downloading?</DialogTitle>
+            <DialogTitle>
+              {status === 'interrupted' ? 'Leave while recording is interrupted?' : 'Leave before downloading?'}
+            </DialogTitle>
             <DialogDescription>
-              You will lose the local recording if you leave before downloading it.
+              {status === 'interrupted'
+                ? 'Your local recording was interrupted. Leaving now may discard captured data before you end the meeting or restart recording.'
+                : 'You will lose the local recording if you leave before downloading it.'}
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-2">
@@ -184,6 +172,25 @@ export function triggerLocalRecordingStart() {
       toast.warning(
         'Recording started without audio. End the meeting, then rejoin and enable tab audio when Chrome prompts you.'
       )
+    }
+  })
+}
+
+export function triggerLocalRecordingRestart() {
+  toast.info(
+    'Choose this browser tab again and enable "Share tab audio" to resume recording.',
+    { duration: 10000 }
+  )
+  void import('@/lib/localRecordingCapture').then(async ({ restartLocalRecordingCapture }) => {
+    const result = await restartLocalRecordingCapture()
+    if (!result.ok) {
+      if (result.reason === 'cancelled') return
+      toast.error('Could not restart screen recording')
+      return
+    }
+    toast.success('Screen recording restarted')
+    if (!result.hasAudio) {
+      toast.warning('Recording restarted without audio. Enable tab audio when Chrome prompts you.')
     }
   })
 }

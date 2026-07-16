@@ -40,11 +40,11 @@ export function StartMeetingDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>How do you want to join?</DialogTitle>
+          <DialogTitle>How do you want to start?</DialogTitle>
           <DialogDescription>
-            Choose before starting the meeting. You can manage participants from this dashboard in
+            Choose where you will host the meeting. You can manage participants from this dashboard in
             either mode.
           </DialogDescription>
         </DialogHeader>

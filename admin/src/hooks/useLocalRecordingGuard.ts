@@ -1,13 +1,18 @@
 import { useEffect } from 'react'
 import { useBlocker } from 'react-router-dom'
 import { shouldBlockNavigation, useLocalRecordingStore } from '@/stores/localRecordingStore'
+import { useSessionStore } from '@/stores/sessionStore'
 
 export function useLocalRecordingGuard() {
   const status = useLocalRecordingStore((s) => s.status)
   const downloaded = useLocalRecordingStore((s) => s.downloaded)
+  const meetingLive = useSessionStore((s) => s.meetingLive)
   const setShowLeaveWarning = useLocalRecordingStore((s) => s.setShowLeaveWarning)
 
-  const shouldBlock = status === 'finalizing' || (status === 'ready' && !downloaded)
+  const shouldBlock =
+    status === 'finalizing' ||
+    (status === 'ready' && !downloaded) ||
+    (status === 'interrupted' && meetingLive)
 
   const blocker = useBlocker(shouldBlock)
 

@@ -4,20 +4,22 @@ import { UserRound, Users } from 'lucide-react'
 import { fetchUsers } from '@/api/users'
 import { fetchHealth } from '@/api/health'
 import { useAuth } from '@/auth/AuthContext'
+import { resolveUsername } from '@/lib/userDisplay'
 import { useSessionStore } from '@/stores/sessionStore'
 
-const MAX_LATENCY_SAMPLES = 20
+const MIN_SAMPLES = 3
+const EMA_ALPHA = 0.25
+const MIN_DISPLAY_MS = 5
+const MAX_DISPLAY_MS = 500
 
-function percentile95(samples: number[]): number | null {
-  if (samples.length === 0) return null
-  const sorted = [...samples].sort((a, b) => a - b)
-  const index = Math.min(sorted.length - 1, Math.ceil(0.95 * sorted.length) - 1)
-  return sorted[index]
+function clampLatency(ms: number) {
+  return Math.min(MAX_DISPLAY_MS, Math.max(MIN_DISPLAY_MS, ms))
 }
 
 export function RightPanel() {
   const { isSuperAdmin } = useAuth()
-  const [latencySamples, setLatencySamples] = useState<number[]>([])
+  const [latencyEma, setLatencyEma] = useState<number | null>(null)
+  const [sampleCount, setSampleCount] = useState(0)
   const socketConnected = useSessionStore((s) => s.socketConnected)
   const showUserStats = !isSuperAdmin
 
@@ -34,13 +36,21 @@ export function RightPanel() {
       const start = performance.now()
       const result = await fetchHealth()
       const durationMs = Math.round(performance.now() - start)
-      setLatencySamples((prev) => [...prev.slice(-(MAX_LATENCY_SAMPLES - 1)), durationMs])
+      setSampleCount((prev) => prev + 1)
+      setLatencyEma((prev) => {
+        if (prev === null) return durationMs
+        return Math.round(prev * (1 - EMA_ALPHA) + durationMs * EMA_ALPHA)
+      })
       return result
     },
     refetchInterval: 30_000,
   })
 
-  const p95Latency = useMemo(() => percentile95(latencySamples), [latencySamples])
+  const displayLatency = useMemo(() => {
+    if (sampleCount < MIN_SAMPLES || latencyEma === null) return null
+    return clampLatency(latencyEma)
+  }, [latencyEma, sampleCount])
+
   const activeUsers = useMemo(
     () => (showUserStats ? (usersQuery.data ?? []).filter((u) => u.isOnline) : []),
     [showUserStats, usersQuery.data]
@@ -69,10 +79,10 @@ export function RightPanel() {
           )}
           <div className="rounded-xl border border-white/70 bg-white/45 p-3 shadow-sm backdrop-blur-md">
             <p className="mb-1 whitespace-nowrap text-[9.5px] uppercase tracking-wide text-muted-foreground">
-              P95 Latency
+              API Latency
             </p>
             <p className="text-base font-semibold text-foreground">
-              {p95Latency !== null ? `${p95Latency}ms` : '—'}
+              {displayLatency !== null ? `${displayLatency}ms` : '—'}
             </p>
           </div>
         </div>
@@ -101,7 +111,7 @@ export function RightPanel() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {user.username ?? user.name ?? user.email ?? 'Unknown user'}
+                      {resolveUsername(user) || 'Unknown user'}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">{user.phone || 'No phone on file'}</p>
                   </div>
