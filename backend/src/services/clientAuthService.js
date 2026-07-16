@@ -132,10 +132,6 @@ export async function loginClient(loginId, password, device = {}) {
     sdkKey: process.env.ZOOM_SDK_KEY ?? null,
   };
 
-  // #region agent log
-  fetch('http://127.0.0.1:7888/ingest/29879b66-38f4-4acd-a773-f8eca05bf505',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'e9d75f'},body:JSON.stringify({sessionId:'e9d75f',runId:'post-fix-v2',hypothesisId:'H1',location:'clientAuthService.js:loginClient',message:'login success response',data:{hasSdkKey:Boolean(response.sdkKey),userId:user._id.toString()},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   return response;
 }
 
