@@ -1,16 +1,14 @@
 /**
  * Reference implementation for Android APK — copy into your app module.
  *
- * Wire to:
- * - POST /api/home → response.meeting
- * - WebSocket STATUS_SYNC / SESSION_STARTED / USER_ACTIVATED
- * - POST /api/token/zoom fallback when JWT expires
- *
- * See Android_APK_API_Guide.md for full API spec.
+ * Production interim (old backend): if top-level sdkKey is null, extract appKey/sdkKey
+ * from the signed sdkJwt payload — verified on zoomcontrol.onrender.com Jul 2026.
  */
 package com.zoomcontrol.app.zoom
 
 import android.content.Context
+import android.util.Base64
+import org.json.JSONObject
 
 data class MeetingJoinPayload(
     val sdkKey: String?,
@@ -24,15 +22,31 @@ object ZoomMeetingJoinHelper {
 
     private var cachedSdkKey: String? = null
 
-    /**
-     * Parse meeting object from /api/home or WebSocket event.
-     * Always use fresh jwtToken — never cache signatures.
-     */
+    /** Use when API returns sdkKey=null but sdkJwt is present (current production). */
+    fun resolveSdkKey(explicitSdkKey: String?, jwt: String): String? {
+        if (!explicitSdkKey.isNullOrBlank()) return explicitSdkKey
+        cachedSdkKey?.let { return it }
+        return extractSdkKeyFromJwt(jwt)?.also { cachedSdkKey = it }
+    }
+
+    fun extractSdkKeyFromJwt(jwt: String): String? {
+        val parts = jwt.split('.')
+        if (parts.size < 2) return null
+        return try {
+            val json = String(Base64.decode(parts[1], Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING))
+            val obj = JSONObject(json)
+            obj.optString("sdkKey").takeIf { it.isNotBlank() }
+                ?: obj.optString("appKey").takeIf { it.isNotBlank() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     fun fromApiMap(map: Map<String, Any?>, displayName: String): MeetingJoinPayload? {
         val jwt = map["jwtToken"] as? String ?: return null
         val meetingId = map["meetingId"] as? String ?: map["meetingNumber"] as? String ?: return null
         val password = map["meetingPassword"] as? String ?: map["password"] as? String ?: ""
-        val sdkKey = map["sdkKey"] as? String
+        val sdkKey = resolveSdkKey(map["sdkKey"] as? String, jwt)
         return MeetingJoinPayload(sdkKey, jwt, meetingId, password, displayName)
     }
 
@@ -42,11 +56,11 @@ object ZoomMeetingJoinHelper {
         meetingNumber: String,
         password: String,
         displayName: String,
-    ): MeetingJoinPayload = MeetingJoinPayload(sdkKey, sdkJwt, meetingNumber, password, displayName)
+    ): MeetingJoinPayload = MeetingJoinPayload(resolveSdkKey(sdkKey, sdkJwt), sdkJwt, meetingNumber, password, displayName)
 
     fun joinZoomMeeting(context: Context, payload: MeetingJoinPayload) {
-        val sdkKey = payload.sdkKey ?: cachedSdkKey
-            ?: error("sdkKey missing — cannot initialize Zoom SDK. Check backend ZOOM_SDK_KEY env.")
+        val sdkKey = resolveSdkKey(payload.sdkKey, payload.jwtToken)
+            ?: error("sdkKey missing — call POST /api/token/zoom after login or wait for backend deploy.")
 
         cachedSdkKey = sdkKey
 

@@ -570,6 +570,8 @@ Without this header → `HTTP 403`:
 
 **When to call:** only if join fails due to expired JWT. Prefer credentials from `/api/home` or WebSocket `STATUS_SYNC` / `SESSION_STARTED` first.
 
+> **Production interim (old backend):** If `sdkKey` is `null` but `sdkJwt` is present, read `appKey` or `sdkKey` from the JWT payload (base64-decode the middle segment). Verified working on `zoomcontrol.onrender.com`. See `docs/android/ZoomMeetingJoinHelper.kt` → `extractSdkKeyFromJwt()`.
+
 ---
 
 ## 5. WebSocket — `/client` namespace
