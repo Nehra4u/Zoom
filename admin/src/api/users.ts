@@ -26,7 +26,7 @@ export async function createUser(payload: {
   status?: UserStatus
 }) {
   const { data } = await api.post<{ user: RawApkUser }>('/users', {
-    name: payload.username.trim(),
+    username: payload.username.trim(),
     email: payload.email.trim(),
     password: payload.password,
     phone: payload.phone,
@@ -46,7 +46,7 @@ export async function updateUser(
   }
 ) {
   const body: Record<string, string | undefined> = {}
-  if (payload.username !== undefined) body.name = payload.username.trim()
+  if (payload.username !== undefined) body.username = payload.username.trim()
   if (payload.email !== undefined) body.email = payload.email || undefined
   if (payload.phone !== undefined) body.phone = payload.phone
   if (payload.zoomDisplayName !== undefined) body.zoomDisplayName = payload.zoomDisplayName
