@@ -44,7 +44,30 @@ Create an IAM policy (or attach inline) to the **EC2 instance profile** used by 
 
 When this role is attached, **do not set** `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` in EB env vars. The SDK picks up the instance profile automatically (see `src/services/s3Service.js`).
 
-## 2. Create Elastic Beanstalk application
+## Quick setup (automated)
+
+With AWS CLI configured (`aws configure`):
+
+```bash
+export AWS_REGION=ap-south-1
+./backend/scripts/setup-aws-eb.sh
+```
+
+This creates the S3 bucket (if missing), EB application, packages `backend/`, deploys, and syncs env vars from `backend/.env` (gitignored).
+
+After the environment is up, set HTTPS/custom domain and run:
+
+```bash
+PUBLIC_API_URL=https://your-api-domain ./backend/scripts/update-eb-public-url.sh
+VERCEL_TOKEN=xxx API_URL=https://your-api-domain ./scripts/update-vercel-api-url.sh
+./scripts/post-deploy-verify.sh https://your-api-domain
+```
+
+IAM policy template for S3 access: [`infra/aws/iam-s3-recordings-policy.json`](../../infra/aws/iam-s3-recordings-policy.json)
+
+---
+
+## 2. Create Elastic Beanstalk application (manual)
 
 1. AWS Console → **Elastic Beanstalk** → Create application
 2. **Application name:** `zoomcontrol-backend`

@@ -1,0 +1,3 @@
+# Local deployment state (API URLs, EB env names). Do not commit secrets.
+*
+!.gitignore
