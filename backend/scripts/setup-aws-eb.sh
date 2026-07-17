@@ -30,17 +30,22 @@ echo "==> Using AWS account:"
 aws sts get-caller-identity
 echo "==> Region: $AWS_REGION | App: $APP_NAME | Env: $ENV_NAME"
 
-# --- S3 bucket for recordings (idempotent) ---
-if ! aws s3api head-bucket --bucket "$S3_BUCKET" 2>/dev/null; then
+# --- S3 bucket for recordings (idempotent, optional) ---
+if aws s3api head-bucket --bucket "$S3_BUCKET" 2>/dev/null; then
+  echo "==> S3 bucket exists: $S3_BUCKET"
+else
   echo "==> Creating S3 bucket: $S3_BUCKET"
+  CREATE_OK=false
   if [[ "$AWS_REGION" == "us-east-1" ]]; then
-    aws s3api create-bucket --bucket "$S3_BUCKET"
+    aws s3api create-bucket --bucket "$S3_BUCKET" 2>/dev/null && CREATE_OK=true
   else
     aws s3api create-bucket --bucket "$S3_BUCKET" \
-      --create-bucket-configuration "LocationConstraint=$AWS_REGION"
+      --create-bucket-configuration "LocationConstraint=$AWS_REGION" 2>/dev/null && CREATE_OK=true
   fi
-else
-  echo "==> S3 bucket exists: $S3_BUCKET"
+  if [[ "$CREATE_OK" != "true" ]]; then
+    echo "WARN: Could not create S3 bucket $S3_BUCKET (missing s3:CreateBucket?)."
+    echo "      Create it manually in AWS Console ($AWS_REGION), then run attach-eb-s3-iam.sh"
+  fi
 fi
 
 # --- EB application ---
@@ -103,7 +108,7 @@ build_option_settings() {
     val="${line#*=}"
     # Skip local-only keys; EB sets PORT/NODE_ENV
     case "$key" in
-      PORT|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY) continue ;;
+      PORT|AWS_ACCESS_KEY_ID|AWS_SECRET_ACCESS_KEY|PUBLIC_API_URL) continue ;;
     esac
     settings+=("Namespace=aws:elasticbeanstalk:application:environment,OptionName=${key},Value=${val}")
   done < <(load_env)
@@ -114,8 +119,21 @@ build_option_settings() {
   settings+=("Namespace=aws:elasticbeanstalk:application:environment,OptionName=AWS_S3_BUCKET,Value=${S3_BUCKET}")
   settings+=("Namespace=aws:elasticbeanstalk:application:environment,OptionName=ADMIN_PORTAL_URL,Value=${ADMIN_URL}")
   settings+=("Namespace=aws:elasticbeanstalk:application:environment,OptionName=ZOOM_MOCK,Value=false")
+  settings+=("Namespace=aws:autoscaling:launchconfiguration,OptionName=IamInstanceProfile,Value=aws-elasticbeanstalk-ec2-role")
+  settings+=("Namespace=aws:elasticbeanstalk:environment,OptionName=ServiceRole,Value=aws-elasticbeanstalk-service-role")
 
   printf '%s\n' "${settings[@]}"
+}
+
+run_with_option_settings() {
+  local aws_cmd=$1
+  shift
+  local OPT_ARGS=()
+  local s
+  while IFS= read -r s; do
+    [[ -n "$s" ]] && OPT_ARGS+=(--option-settings "$s")
+  done < <(build_option_settings)
+  "$aws_cmd" "$@" "${OPT_ARGS[@]}"
 }
 
 # --- Create or update environment ---
@@ -126,27 +144,19 @@ if aws elasticbeanstalk describe-environments \
   --query 'Environments[?Status!=`Terminated`].EnvironmentName' \
   --output text 2>/dev/null | grep -q "$ENV_NAME"; then
   echo "==> Updating existing environment: $ENV_NAME"
-  mapfile -t SETTINGS < <(build_option_settings)
-  OPT_ARGS=()
-  for s in "${SETTINGS[@]}"; do OPT_ARGS+=(--option-settings "$s"); done
-  aws elasticbeanstalk update-environment \
+  run_with_option_settings aws elasticbeanstalk update-environment \
     --environment-name "$ENV_NAME" \
     --version-label "$VERSION_LABEL" \
-    --region "$AWS_REGION" \
-    "${OPT_ARGS[@]}"
+    --region "$AWS_REGION"
 else
   echo "==> Creating environment: $ENV_NAME (5–10 min)"
-  mapfile -t SETTINGS < <(build_option_settings)
-  OPT_ARGS=()
-  for s in "${SETTINGS[@]}"; do OPT_ARGS+=(--option-settings "$s"); done
-  aws elasticbeanstalk create-environment \
+  run_with_option_settings aws elasticbeanstalk create-environment \
     --application-name "$APP_NAME" \
     --environment-name "$ENV_NAME" \
     --solution-stack-name "$STACK" \
     --version-label "$VERSION_LABEL" \
     --tier Name=WebServer,Type=Standard \
-    --region "$AWS_REGION" \
-    "${OPT_ARGS[@]}"
+    --region "$AWS_REGION"
 fi
 
 echo "==> Waiting for environment to become Ready..."
@@ -161,6 +171,18 @@ CNAME=$(aws elasticbeanstalk describe-environments \
   --output text)
 
 API_URL="http://${CNAME}"
+echo ""
+echo "==> Setting PUBLIC_API_URL on environment..."
+aws elasticbeanstalk update-environment \
+  --environment-name "$ENV_NAME" \
+  --region "$AWS_REGION" \
+  --option-settings \
+    "Namespace=aws:elasticbeanstalk:application:environment,OptionName=PUBLIC_API_URL,Value=${API_URL}" \
+  >/dev/null
+aws elasticbeanstalk wait environment-updated \
+  --environment-names "$ENV_NAME" \
+  --region "$AWS_REGION"
+
 echo ""
 echo "============================================"
 echo " EB environment ready"

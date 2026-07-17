@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { rateLimit } from 'express-rate-limit';
+import { rateLimit, ipKeyGenerator } from 'express-rate-limit';
 import { authenticate, adminOnly, regularAdminOnly, authenticateClient } from '../middleware/authenticate.js';
 import {
   getUserVoiceRecordingPlayUrl,
@@ -20,7 +20,7 @@ const uploadLimiter = rateLimit({
   max: process.env.NODE_ENV === 'production' ? 30 : 200,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => req.client?.sub ?? req.ip,
+  keyGenerator: (req) => req.client?.sub ?? ipKeyGenerator(req.ip),
   message: { error: 'Too many uploads. Please try again later.' },
 });
 

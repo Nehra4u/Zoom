@@ -11,8 +11,8 @@
         "s3:ListBucket"
       ],
       "Resource": [
-        "arn:aws:s3:::zoomcontrol-recordings",
-        "arn:aws:s3:::zoomcontrol-recordings/*"
+        "arn:aws:s3:::zoomcontrol-recordings-prod",
+        "arn:aws:s3:::zoomcontrol-recordings-prod/*"
       ]
     }
   ]
