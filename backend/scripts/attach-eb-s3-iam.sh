@@ -6,6 +6,8 @@
 
 set -euo pipefail
 
+die() { echo "ERROR: $*" >&2; exit 1; }
+
 AWS_REGION="${AWS_REGION:-ap-south-1}"
 ENV_NAME="${EB_ENV_NAME:-zoomcontrol-backend-prod}"
 POLICY_NAME="${IAM_POLICY_NAME:-ZoomControlS3RecordingsAccess}"

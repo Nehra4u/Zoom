@@ -61,3 +61,16 @@ npm run test:smoke   # Quick API smoke test
 npm run test:e2e     # Full lifecycle flows
 npm run test:mongo   # MongoDB connection check
 ```
+
+## Deploy to AWS (backend)
+
+Admin stays on **Vercel** (`https://zoomcontrol-admin.vercel.app`). Backend deploys to **AWS Elastic Beanstalk**.
+
+See [`docs/AWS_RUNBOOK.md`](docs/AWS_RUNBOOK.md) and [`backend/docs/DEPLOY_AWS.md`](backend/docs/DEPLOY_AWS.md).
+
+Quick start (requires `aws configure`):
+
+```bash
+export AWS_REGION=ap-south-1
+./backend/scripts/setup-aws-eb.sh
+```
