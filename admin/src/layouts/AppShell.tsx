@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Film,
   LayoutDashboard,
+  Mic,
   Rocket,
   Settings,
   Shield,
@@ -51,6 +52,7 @@ const OPERATIONS_ITEMS: NavItem[] = [
 
 const RECORDS_ITEMS: NavItem[] = [
   { to: '/recordings', label: 'Recording', icon: Film, adminOnly: true },
+  { to: '/user-recordings', label: 'User Recordings', icon: Mic, adminOnly: true },
   { to: '/system', label: 'Settings', icon: Settings },
 ]
 
@@ -102,6 +104,12 @@ function getPageHeading(pathname: string, isSuperAdmin: boolean): { title: strin
   }
   if (pathname.startsWith('/users')) {
     return { title: 'User Management', subtitle: 'Manage client accounts that join via the Android app' }
+  }
+  if (pathname.startsWith('/user-recordings')) {
+    return {
+      title: 'User Recordings',
+      subtitle: 'Push-to-talk voice recordings from Android users, grouped by user and day',
+    }
   }
   if (pathname.startsWith('/recordings')) {
     return { title: 'Recording', subtitle: 'Cloud recordings from Zoom — play URLs fetched fresh on demand' }

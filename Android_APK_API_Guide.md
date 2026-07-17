@@ -21,6 +21,7 @@ This document is the single reference for Android developers integrating with th
    - [POST /api/users/profile](#post-apiusersprofile)
    - [POST /api/home](#post-apihome)
    - [POST /api/token/zoom](#post-apitokenzoom)
+   - [POST /api/user-voice-recordings](#post-apiuser-voice-recordings)
 5. [WebSocket — `/client` namespace](#5-websocket--client-namespace)
 6. [Zoom meeting join flow](#6-zoom-meeting-join-flow)
 7. [Error handling guide](#7-error-handling-guide)
@@ -574,6 +575,76 @@ Without this header → `HTTP 403`:
 
 ---
 
+### POST /api/user-voice-recordings
+
+Upload a push-to-talk voice recording after the user stops recording. The file is stored in AWS S3; admins can browse recordings in the portal under **User Recordings**.
+
+**Auth required:** Yes (client access token)
+
+**Content-Type:** `multipart/form-data`
+
+**Form fields**
+
+| Field | Type | Required | Notes |
+|-------|------|----------|-------|
+| `file` | file | Yes | Audio file (e.g. `.m4a`, AAC, MP3, WAV). Max **25 MB**. |
+| `durationMs` | number/string | No | Recording length in milliseconds |
+| `recordedAt` | ISO-8601 string | No | When recording started/ended on device; defaults to server time |
+| `deviceId` | string | No | Same stable UUID sent on login and `/api/home` |
+
+**Recommended Android flow**
+
+1. User presses and holds a record button → start `MediaRecorder` (prefer **AAC / `.m4a`**).
+2. User releases → stop recorder, get local file + duration.
+3. `POST /api/user-voice-recordings` with `Authorization: Bearer <accessToken>`.
+4. On **201**, delete local temp file. On network error, retry with exponential backoff (do not re-upload if server already returned 201).
+
+**Response — success** (`HTTP 201`)
+
+```json
+{
+  "recording": {
+    "id": "665f1a2b3c4d5e6f7a8b9c0d",
+    "userId": "665f0...",
+    "recordedAt": "2026-07-17T10:42:00.000Z",
+    "durationMs": 34000,
+    "fileSizeBytes": 131072,
+    "mimeType": "audio/mp4",
+    "deviceId": "device-uuid",
+    "createdAt": "2026-07-17T10:42:05.000Z"
+  }
+}
+```
+
+**Errors**
+
+| HTTP | error | Meaning |
+|------|-------|---------|
+| 400 | Audio file is required / Unsupported audio file type | Missing or invalid file |
+| 401 | Invalid/expired token | Refresh access token, retry once |
+| 403 | User account is not active | Account deactivated |
+| 413 | File exceeds maximum size of 25 MB | Split or compress recording |
+| 429 | Too many uploads | Rate limited — wait and retry |
+| 503 | AWS S3 is not configured | Backend misconfiguration |
+
+**Retrofit example**
+
+```kotlin
+@Multipart
+@POST("user-voice-recordings")
+suspend fun uploadVoiceRecording(
+    @Header("Authorization") bearer: String,
+    @Part file: MultipartBody.Part,
+    @Part("durationMs") durationMs: RequestBody? = null,
+    @Part("recordedAt") recordedAt: RequestBody? = null,
+    @Part("deviceId") deviceId: RequestBody? = null,
+): VoiceRecordingUploadResponse
+```
+
+Use OkHttp `MultipartBody.Part.createFormData("file", fileName, fileRequestBody)` for the audio file.
+
+---
+
 ## 5. WebSocket — `/client` namespace
 
 ### Connection setup
@@ -943,6 +1014,15 @@ Wire this to `SESSION_STARTED`, `STATUS_SYNC` (when `shouldBeInMeeting == true`)
 - [ ] Clear all local storage
 - [ ] Navigate to Login
 
+### Voice recording (push-to-talk)
+
+- [ ] Request `RECORD_AUDIO` permission
+- [ ] Record with `MediaRecorder` on button press/release (recommend AAC → `.m4a`)
+- [ ] Upload on stop via `POST /api/user-voice-recordings` (`multipart/form-data`)
+- [ ] Send `durationMs`, `recordedAt` (ISO), and stable `deviceId`
+- [ ] Retry failed uploads with backoff; skip re-upload if server returned 201
+- [ ] Delete local temp file after successful upload
+
 ---
 
 ## 9. Retrofit interface examples
@@ -1033,6 +1113,16 @@ interface ZoomControlApi {
         @Header("Authorization") bearer: String,
         @Header("X-Client-Platform") platform: String = "android"
     ): ZoomTokenResponse
+
+    @Multipart
+    @POST("user-voice-recordings")
+    suspend fun uploadVoiceRecording(
+        @Header("Authorization") bearer: String,
+        @Part file: MultipartBody.Part,
+        @Part("durationMs") durationMs: RequestBody? = null,
+        @Part("recordedAt") recordedAt: RequestBody? = null,
+        @Part("deviceId") deviceId: RequestBody? = null,
+    ): VoiceRecordingUploadResponse
 }
 ```
 
@@ -1050,6 +1140,7 @@ interface ZoomControlApi {
 | POST | `/api/users/profile` | Yes | Complete profile |
 | POST | `/api/home` | Yes | Home bootstrap + meeting + WS config |
 | POST | `/api/token/zoom` | Yes + `X-Client-Platform: android` | Fresh Zoom SDK JWT |
+| POST | `/api/user-voice-recordings` | Yes | Upload push-to-talk voice recording (multipart) |
 
 ### Home `currentStatus` values
 

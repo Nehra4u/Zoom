@@ -12,6 +12,7 @@ import { AdminListPage } from '@/pages/admins/AdminListPage'
 import { AdminCreatePage } from '@/pages/admins/AdminCreatePage'
 import { AdminDetailPage } from '@/pages/admins/AdminDetailPage'
 import { RecordingListPage } from '@/pages/recordings/RecordingListPage'
+import { UserVoiceRecordingsPage } from '@/pages/user-recordings/UserVoiceRecordingsPage'
 import { AuditLogPage } from '@/pages/audit/AuditLogPage'
 import { SystemPage } from '@/pages/system/SystemPage'
 import { AppDetailsPage } from '@/pages/system/AppDetailsPage'
@@ -39,6 +40,7 @@ const router = createBrowserRouter([
               { path: 'users/new', element: <UserCreatePage /> },
               { path: 'users/:id', element: <UserDetailPage /> },
               { path: 'recordings', element: <RecordingListPage /> },
+              { path: 'user-recordings', element: <UserVoiceRecordingsPage /> },
             ],
           },
           { path: 'audit-logs', element: <AuditLogPage /> },

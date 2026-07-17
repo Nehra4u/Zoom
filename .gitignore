@@ -5,6 +5,11 @@ node_modules/
 .env
 .env.local
 .env.*.local
+!.env.example
+!.env.production
+
+# Vercel local metadata
+.vercel/
 
 # Build output
 dist/

@@ -17,6 +17,7 @@ import tokenRoutes from './routes/token.js';
 import recordingRoutes from './routes/recordings.js';
 import settingsRoutes from './routes/settings.js';
 import auditLogRoutes from './routes/auditLogs.js';
+import userVoiceRecordingRoutes from './routes/userVoiceRecordings.js';
 import { setupSocket } from './socket/index.js';
 import { handleZoomWebhookEvent } from './webhooks/zoom.js';
 import { startReconciliationJob, getReconciliationStatus } from './services/reconciliationService.js';
@@ -78,6 +79,7 @@ app.use('/api', homeRoutes);
 app.use('/api/session', sessionRoutes);
 app.use('/api/token', tokenRoutes);
 app.use('/api/recordings', recordingRoutes);
+app.use('/api/user-voice-recordings', userVoiceRecordingRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/audit-logs', auditLogRoutes);
 
