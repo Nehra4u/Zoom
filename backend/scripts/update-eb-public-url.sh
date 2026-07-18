@@ -5,7 +5,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-ENV_NAME="${EB_ENV_NAME:-$(cat "$ROOT/.deploy/eb-env-name.txt" 2>/dev/null || echo zoomcontrol-backend-prod)}"
+ENV_NAME="${EB_ENV_NAME:-$(cat "$ROOT/.deploy/eb-env-name.txt" 2>/dev/null || echo zoomcontrol-backend-prod-v2)}"
 AWS_REGION="${AWS_REGION:-ap-south-1}"
 PUBLIC_API_URL="${PUBLIC_API_URL:?Set PUBLIC_API_URL=https://your-api-domain}"
 

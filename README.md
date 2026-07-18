@@ -68,6 +68,8 @@ Admin stays on **Vercel** (`https://zoomcontrol-admin.vercel.app`). Backend depl
 
 See [`docs/AWS_RUNBOOK.md`](docs/AWS_RUNBOOK.md) and [`backend/docs/DEPLOY_AWS.md`](backend/docs/DEPLOY_AWS.md).
 
+**Production domain:** [`docs/MEETVERDURE_DEPLOY.md`](docs/MEETVERDURE_DEPLOY.md) — `https://api.meetverdure.com`
+
 Quick start (requires `aws configure`):
 
 ```bash
