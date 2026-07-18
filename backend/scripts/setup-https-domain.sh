@@ -98,14 +98,17 @@ fi
 
 echo "==> Certificate ISSUED. Configuring EB HTTPS listener on port 443 ..."
 
+# Classic ELB (default for this EB env) — not ALB/elbv2
 aws elasticbeanstalk update-environment \
   --environment-name "$EB_ENV" \
   --region "$AWS_REGION" \
   --option-settings \
-    "Namespace=aws:elbv2:listener:443,OptionName=ListenerEnabled,Value=true" \
-    "Namespace=aws:elbv2:listener:443,OptionName=Protocol,Value=HTTPS" \
-    "Namespace=aws:elbv2:listener:443,OptionName=SSLCertificateArns,Value=$CERT_ARN" \
-    "Namespace=aws:elbv2:listener:443,OptionName=DefaultProcess,Value=default" \
+    "Namespace=aws:elb:loadbalancer,OptionName=SSLCertificateId,Value=$CERT_ARN" \
+    "Namespace=aws:elb:listener:443,OptionName=ListenerEnabled,Value=true" \
+    "Namespace=aws:elb:listener:443,OptionName=ListenerProtocol,Value=HTTPS" \
+    "Namespace=aws:elb:listener:443,OptionName=InstancePort,Value=80" \
+    "Namespace=aws:elb:listener:443,OptionName=InstanceProtocol,Value=HTTP" \
+    "Namespace=aws:elb:listener:443,OptionName=SSLCertificateId,Value=$CERT_ARN" \
   --query Status --output text
 
 echo "==> Waiting for EB update ..."
