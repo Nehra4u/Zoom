@@ -12,6 +12,10 @@ const MOCK_ADMIN = {
   updatedAt: '2026-01-01T00:00:00.000Z',
   lastLoginAt: null,
   zoomHostUserId: null,
+  licenseEndDate: '2027-01-01T23:59:59.999Z',
+  licenseIsActive: true,
+  licenseDaysRemaining: 365,
+  licenseExpiringThisWeek: false,
 }
 
 const MOCK_SUPER_ADMIN = {

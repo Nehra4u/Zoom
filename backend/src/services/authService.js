@@ -11,7 +11,7 @@ import {
 } from '../services/tokenService.js';
 import { toPublicAdmin } from '../services/adminService.js';
 import { notifyAdminSessionRevoked } from './notificationService.js';
-import { assertSubscriptionActive } from './settingsService.js';
+import { assertAdminLicenseActive } from './adminLicenseService.js';
 
 const MAX_FAILED = 5;
 const LOCKOUT_MINUTES = 5;
@@ -38,8 +38,6 @@ async function findAdminByIdentifier(identifier) {
 }
 
 export async function loginAdmin(identifier, password) {
-  await assertSubscriptionActive();
-
   const admin = await findAdminByIdentifier(identifier);
   if (!admin || admin.status !== 'active') {
     const err = new Error('Invalid credentials');
@@ -73,6 +71,8 @@ export async function loginAdmin(identifier, password) {
     admin.lockedUntil = null;
   }
 
+  await assertAdminLicenseActive(admin._id);
+
   admin.lastLoginAt = new Date();
 
   await AdminRefreshToken.updateMany(
@@ -102,8 +102,6 @@ export async function loginAdmin(identifier, password) {
 }
 
 export async function refreshAdminToken(refreshToken) {
-  await assertSubscriptionActive();
-
   const tokenHash = hashToken(refreshToken);
   const stored = await AdminRefreshToken.findOne({ tokenHash, revokedAt: null });
   if (!stored || stored.expiresAt < new Date()) {
@@ -125,6 +123,8 @@ export async function refreshAdminToken(refreshToken) {
     err.code = 'SESSION_SUPERSEDED';
     throw err;
   }
+
+  await assertAdminLicenseActive(admin._id);
 
   stored.revokedAt = new Date();
   await stored.save();

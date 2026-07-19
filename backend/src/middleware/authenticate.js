@@ -1,6 +1,6 @@
 import { verifyAdminAccessToken, verifyClientAccessToken } from '../services/tokenService.js';
 import { RevokedToken } from '../models/RevokedToken.js';
-import { assertSubscriptionActive } from '../services/settingsService.js';
+import { assertAdminLicenseActive } from '../services/adminLicenseService.js';
 import { assertAdminSessionActive } from '../services/authService.js';
 
 async function isRevoked(jti) {
@@ -24,7 +24,7 @@ export async function authenticate(req, res, next) {
       return res.status(401).json({ error: 'Token has been revoked' });
     }
     try {
-      await assertSubscriptionActive();
+      await assertAdminLicenseActive(payload.sub);
       await assertAdminSessionActive(payload.sub, payload.sid);
     } catch (err) {
       return res.status(err.status || 403).json({ error: err.message, code: err.code });

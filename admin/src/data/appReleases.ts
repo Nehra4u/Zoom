@@ -20,25 +20,26 @@ export const CURRENT_RELEASE: AppRelease & {
   targetSdk: number
   compileSdk: number
 } = {
-  versionName: '1.0.0',
+  versionName: '1.0.1',
   versionCode: 1,
   packageId: 'com.zoomcontrol.app',
   minSdk: 26,
   targetSdk: 35,
   compileSdk: 35,
-  // TODO: replace with the actual release date once this build ships.
-  releasedAt: '2026-07-01',
-  notes: 'Initial release — meeting join flow, admin-managed accounts, cloud recordings.',
+  releasedAt: '2026-07-19',
+  notes: 'MeetVerdure v1.0.1 — meeting join flow, admin-managed accounts, cloud recordings.',
 }
 
-// TODO: point these at the real hosted APK / Play Store listing / Drive folder.
+const DRIVE_FILE_ID = '1j9XJ5u3xPrNtivXe19SNwLyl3w8QjAoL'
+
 export const APP_DOWNLOAD_LINKS = {
-  apkUrl: '',
+  /** Direct download — triggers file save on click */
+  apkUrl: `https://drive.google.com/uc?export=download&id=${DRIVE_FILE_ID}`,
   playStoreUrl: '',
-  driveUrl: '',
+  /** Share / view in browser */
+  driveUrl: `https://drive.google.com/file/d/${DRIVE_FILE_ID}/view?usp=sharing`,
 }
 
-// TODO: append an entry here each time a new build is released.
 export const PAST_RELEASES: AppRelease[] = [
   {
     versionName: '1.0.0',

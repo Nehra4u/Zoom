@@ -113,7 +113,7 @@ function handleDownload() {
     toast.error('No APK has been uploaded yet — ask engineering for the hosted build link.')
     return
   }
-  window.open(APP_DOWNLOAD_LINKS.apkUrl, '_blank', 'noreferrer')
+  window.location.assign(APP_DOWNLOAD_LINKS.apkUrl)
 }
 
 export function AppDetailsPage() {
@@ -206,13 +206,8 @@ export function AppDetailsPage() {
               <Download className="h-6 w-6 text-chart-1" />
             </div>
             <div className="min-w-0 flex-1 text-center sm:text-left">
-              <p className="text-sm font-semibold text-foreground">ZoomMeets v{CURRENT_RELEASE.versionName}</p>
+              <p className="text-sm font-semibold text-foreground">MeetVerdure v{CURRENT_RELEASE.versionName}</p>
               <p className="text-xs text-muted-foreground">Android APK · build {CURRENT_RELEASE.versionCode}</p>
-              {!APP_DOWNLOAD_LINKS.apkUrl && (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  No APK has been uploaded yet — ask engineering for the hosted build link.
-                </p>
-              )}
             </div>
             <div className="flex shrink-0 gap-2">
               <Button
@@ -220,7 +215,7 @@ export function AppDetailsPage() {
                 className="inline-flex items-center gap-2 whitespace-nowrap bg-green-600 text-white hover:bg-green-700"
               >
                 <Download className="h-4 w-4" />
-                Download APK
+                Download APK MeetVerdure v{CURRENT_RELEASE.versionName}
               </Button>
               <Button variant="outline" onClick={handleShare}>
                 <Share2 className="h-4 w-4" />

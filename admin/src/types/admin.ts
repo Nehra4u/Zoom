@@ -13,6 +13,10 @@ export interface Admin {
   updatedAt: string
   lastLoginAt: string | null
   zoomHostUserId: string | null
+  licenseEndDate: string | null
+  licenseIsActive: boolean
+  licenseDaysRemaining: number | null
+  licenseExpiringThisWeek: boolean
 }
 
 export interface AuthResponse {

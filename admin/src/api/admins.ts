@@ -35,6 +35,7 @@ export async function createAdmin(payload: {
   phone?: string
   role?: 'admin' | 'super_admin'
   zoomHostUserId?: string | null
+  licenseEndDate?: string | null
 }) {
   const { data } = await api.post<{ admin: Admin }>('/admins', payload)
   return data.admin
@@ -53,7 +54,14 @@ export async function fetchZoomAccountUsers() {
 
 export async function updateAdmin(
   id: string,
-  payload: { name?: string; email?: string; phone?: string; role?: string; zoomHostUserId?: string | null }
+  payload: {
+    name?: string
+    email?: string
+    phone?: string
+    role?: string
+    zoomHostUserId?: string | null
+    licenseEndDate?: string | null
+  }
 ) {
   const { data } = await api.patch<{ admin: Admin }>(`/admins/${id}`, payload)
   return data.admin

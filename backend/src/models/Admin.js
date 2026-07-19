@@ -17,6 +17,8 @@ const adminSchema = new mongoose.Schema(
     zoomHostUserId: { type: String, default: null, trim: true },
     /** Active portal session — only one device/tab at a time */
     activeSessionId: { type: String, default: null },
+    /** Optional license expiry for regular admins (end of UTC day); null = no expiry */
+    licenseEndDate: { type: Date, default: null },
   },
   { timestamps: true }
 );
@@ -26,5 +28,6 @@ adminSchema.index({ status: 1 });
 adminSchema.index({ createdBy: 1 });
 adminSchema.index({ email: 1 }, { unique: true, sparse: true });
 adminSchema.index({ phone: 1 }, { unique: true, sparse: true });
+adminSchema.index({ role: 1, licenseEndDate: 1 });
 
 export const Admin = mongoose.model('Admin', adminSchema);

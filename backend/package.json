@@ -14,6 +14,7 @@
     "audit:prod-sdkkey": "node scripts/prod-sdkkey-audit.js",
     "test:ws-admin": "node scripts/e2e-admin-ws.js",
     "test:mongo": "node scripts/test-mongo.js",
+    "test:admin-license": "node scripts/test-admin-license.js",
     "zoom:check": "node scripts/zoom-setup-check.js"
   },
   "devDependencies": {

@@ -1,17 +1,17 @@
 import { Router } from 'express';
 import { authenticate, adminOnly, superAdminOnly } from '../middleware/authenticate.js';
+import { getSubscriptionStatusForAdmin } from '../services/adminLicenseService.js';
 import {
   getSystemSettings,
-  getSubscriptionStatus,
   updateRecordingRetentionDays,
   updateSubscriptionEndDate,
 } from '../services/settingsService.js';
 
 const router = Router();
 
-router.get('/subscription', authenticate, adminOnly, async (_req, res) => {
+router.get('/subscription', authenticate, adminOnly, async (req, res) => {
   try {
-    const subscription = await getSubscriptionStatus();
+    const subscription = await getSubscriptionStatusForAdmin(req.admin.sub);
     res.json({
       endDate: subscription.endDate,
       isActive: subscription.isActive,

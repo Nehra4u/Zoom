@@ -185,6 +185,18 @@ export function notifySubscriptionExpired() {
   });
 }
 
+export function notifyAdminLicenseExpired(adminId) {
+  const io = getIo();
+  if (!io) {
+    console.log(`[notification] admin:subscription:expired → admin:${adminId}`);
+    return;
+  }
+
+  io.of('/admin').to(`admin:${adminId}`).emit('admin:subscription:expired', {
+    message: 'Your subscription has ended. Please contact Administration for reactivating.',
+  });
+}
+
 export function notifyMeetingUpdated(meetingData = {}) {
   const io = getIo();
   if (!io) {

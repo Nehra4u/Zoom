@@ -19,6 +19,7 @@ export function AdminCreatePage() {
   const [password, setPassword] = useState('')
   const [role, setRole] = useState<'admin' | 'super_admin'>('admin')
   const [zoomHostUserId, setZoomHostUserId] = useState('')
+  const [licenseEndDate, setLicenseEndDate] = useState('')
 
   const mutation = useMutation({
     mutationFn: createAdmin,
@@ -39,6 +40,7 @@ export function AdminCreatePage() {
       password,
       role,
       zoomHostUserId: zoomHostUserId.trim() || null,
+      licenseEndDate: role === 'admin' && licenseEndDate.trim() ? licenseEndDate : undefined,
     })
   }
 
@@ -87,11 +89,22 @@ export function AdminCreatePage() {
               </select>
             </div>
             {role === 'admin' && (
-              <ZoomHostUserField
-                id="zoom-host"
-                value={zoomHostUserId}
-                onChange={setZoomHostUserId}
-              />
+              <>
+                <ZoomHostUserField
+                  id="zoom-host"
+                  value={zoomHostUserId}
+                  onChange={setZoomHostUserId}
+                />
+                <div className="space-y-2">
+                  <Label htmlFor="license-end">License expiry date (optional)</Label>
+                  <Input
+                    id="license-end"
+                    type="date"
+                    value={licenseEndDate}
+                    onChange={(e) => setLicenseEndDate(e.target.value)}
+                  />
+                </div>
+              </>
             )}
             <div className="flex gap-3 pt-2">
               <Button type="submit" disabled={mutation.isPending}>

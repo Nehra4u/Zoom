@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { fetchAdmins } from '@/api/admins'
+import { formatLicenseEndDate, isLicenseUrgent } from '@/lib/licenseDisplay'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -47,14 +48,17 @@ export function AdminListPage() {
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
                   <TableHead>Zoom license</TableHead>
+                  <TableHead>License expires</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {admins.map((admin) => (
-                  <TableRow key={admin.id}>
+                {admins.map((admin) => {
+                  const licenseUrgent = isLicenseUrgent(admin)
+                  return (
+                  <TableRow key={admin.id} className={licenseUrgent ? 'text-destructive' : undefined}>
                     <TableCell className="font-medium">{admin.name}</TableCell>
                     <TableCell>{admin.email ?? '—'}</TableCell>
                     <TableCell className="text-muted-foreground">{admin.phone ?? '—'}</TableCell>
@@ -65,6 +69,21 @@ export function AdminListPage() {
                         <Badge variant="success">Assigned</Badge>
                       ) : (
                         <Badge variant="warning">Not assigned</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {admin.role === 'super_admin' ? (
+                        <span className="text-xs text-muted-foreground">N/A</span>
+                      ) : licenseUrgent ? (
+                        <Badge variant="destructive">
+                          {!admin.licenseIsActive
+                            ? 'Expired'
+                            : admin.licenseExpiringThisWeek
+                              ? `Expires ${formatLicenseEndDate(admin.licenseEndDate)}`
+                              : formatLicenseEndDate(admin.licenseEndDate)}
+                        </Badge>
+                      ) : (
+                        <span className="text-sm">{formatLicenseEndDate(admin.licenseEndDate)}</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -79,7 +98,8 @@ export function AdminListPage() {
                       </Button>
                     </TableCell>
                   </TableRow>
-                ))}
+                  )
+                })}
               </TableBody>
             </Table>
           )}

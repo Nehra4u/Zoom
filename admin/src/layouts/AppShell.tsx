@@ -19,6 +19,7 @@ import {
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatSubscriptionRenewal } from '@/lib/licenseDisplay'
 import { useAuth } from '@/auth/AuthContext'
 import { useAdminSocket } from '@/hooks/useAdminSocket'
 import { useSessionSync } from '@/hooks/useSessionSync'
@@ -70,36 +71,6 @@ function isNavItemVisible(item: NavItem, isSuperAdmin: boolean) {
   if (item.superAdminOnly && !isSuperAdmin) return false
   if (item.adminOnly && isSuperAdmin) return false
   return true
-}
-
-function formatSubscriptionRenewal(endDate: string | null, isActive: boolean) {
-  if (!endDate) {
-    return {
-      daysRemaining: null as number | null,
-      isUrgent: false,
-      formatted: 'Not configured',
-      headline: isActive ? 'Subscription active' : 'Subscription ended',
-      expired: !isActive,
-    }
-  }
-
-  const renewalDate = new Date(endDate)
-  const now = new Date()
-  const msPerDay = 1000 * 60 * 60 * 24
-  const daysRemaining = Math.ceil((renewalDate.getTime() - now.getTime()) / msPerDay)
-  const expired = !isActive
-  const isUrgent = !expired && daysRemaining <= 7
-  const formatted = renewalDate.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
-
-  let headline = 'Subscription active'
-  if (expired) headline = 'Subscription ended'
-  else if (isUrgent) headline = `Renews in ${daysRemaining} days`
-
-  return { daysRemaining, isUrgent, formatted, headline, expired }
 }
 
 function getPageHeading(pathname: string, isSuperAdmin: boolean): { title: string; subtitle: string } {
@@ -292,50 +263,77 @@ export function AppShell() {
           <div
             className={cn(
               'group relative overflow-hidden rounded-2xl border p-3.5 shadow-[0_14px_32px_-24px_rgba(30,64,175,0.45)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_18px_36px_-22px_rgba(30,64,175,0.5)]',
-              renewal.expired || renewal.isUrgent
-                ? 'border-destructive/20 bg-gradient-to-br from-destructive/12 to-white/55'
-                : 'border-success/20 bg-gradient-to-br from-success/12 to-white/60'
+              isSuperAdmin
+                ? 'border-chart-1/20 bg-gradient-to-br from-chart-1/12 to-white/60'
+                : renewal.expired || renewal.isUrgent
+                  ? 'border-destructive/20 bg-gradient-to-br from-destructive/12 to-white/55'
+                  : 'border-success/20 bg-gradient-to-br from-success/12 to-white/60'
             )}
           >
             <div
               className={cn(
                 'pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full blur-2xl transition-opacity duration-300 group-hover:opacity-90',
-                renewal.expired || renewal.isUrgent ? 'bg-destructive/25' : 'bg-success/25'
+                isSuperAdmin
+                  ? 'bg-chart-1/25'
+                  : renewal.expired || renewal.isUrgent
+                    ? 'bg-destructive/25'
+                    : 'bg-success/25'
               )}
             />
             <div className="flex items-start gap-2.5">
               <div
                 className={cn(
                   'relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/70 shadow-sm',
-                  renewal.expired || renewal.isUrgent ? 'bg-destructive/15' : 'bg-success/15'
+                  isSuperAdmin
+                    ? 'bg-chart-1/15'
+                    : renewal.expired || renewal.isUrgent
+                      ? 'bg-destructive/15'
+                      : 'bg-success/15'
                 )}
               >
                 <CalendarCheck2
-                  className={cn('h-4 w-4', renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success')}
+                  className={cn(
+                    'h-4 w-4',
+                    isSuperAdmin
+                      ? 'text-chart-1'
+                      : renewal.expired || renewal.isUrgent
+                        ? 'text-destructive'
+                        : 'text-success'
+                  )}
                 />
               </div>
               <div className="relative min-w-0 flex-1">
                 <p className="mb-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-muted-foreground">
-                  Workspace plan
+                  {isSuperAdmin ? 'Platform access' : 'Workspace plan'}
                 </p>
                 <p
                   className={cn(
                     'text-xs font-bold',
-                    renewal.expired || renewal.isUrgent ? 'text-destructive' : 'text-success'
+                    isSuperAdmin
+                      ? 'text-chart-1'
+                      : renewal.expired || renewal.isUrgent
+                        ? 'text-destructive'
+                        : 'text-success'
                   )}
                 >
-                  {renewal.headline}
+                  {isSuperAdmin ? 'Platform admin' : renewal.headline}
                 </p>
                 <p className="mt-0.5 text-[11.5px] text-muted-foreground">
-                  {renewal.expired
-                    ? 'Contact Administration to reactivate'
-                    : `Next renewal on ${renewal.formatted}`}
+                  {isSuperAdmin
+                    ? 'No license expiry applies'
+                    : renewal.expired
+                      ? 'Contact Administration to reactivate'
+                      : `Next renewal on ${renewal.formatted}`}
                 </p>
               </div>
               <span
                 className={cn(
                   'relative mt-1 h-2 w-2 shrink-0 rounded-full shadow-[0_0_0_4px_rgba(255,255,255,0.55)]',
-                  renewal.expired || renewal.isUrgent ? 'bg-destructive' : 'bg-success'
+                  isSuperAdmin
+                    ? 'bg-chart-1'
+                    : renewal.expired || renewal.isUrgent
+                      ? 'bg-destructive'
+                      : 'bg-success'
                 )}
               />
             </div>

@@ -22,6 +22,10 @@ import { setupSocket } from './socket/index.js';
 import { handleZoomWebhookEvent } from './webhooks/zoom.js';
 import { startReconciliationJob, getReconciliationStatus } from './services/reconciliationService.js';
 import { startRecordingRetentionJob } from './services/settingsService.js';
+import {
+  migrateGlobalSubscriptionToAdmins,
+  startAdminLicenseExpiryJob,
+} from './services/adminLicenseService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -101,9 +105,14 @@ const port = process.env.PORT || 3001;
 
 async function start() {
   await connectDb();
+  const migration = await migrateGlobalSubscriptionToAdmins();
+  if (migration.updated > 0) {
+    console.log(`[admin-license] Migrated global subscription to ${migration.updated} admin(s)`);
+  }
   setupSocket(httpServer);
   startReconciliationJob();
   startRecordingRetentionJob();
+  startAdminLicenseExpiryJob();
   httpServer.listen(port, () => {
     console.log(`Backend listening on http://localhost:${port}`);
   });

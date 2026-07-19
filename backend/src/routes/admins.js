@@ -29,7 +29,7 @@ router.get('/', async (req, res) => {
 
 router.post('/', async (req, res) => {
   try {
-    const { name, email, phone, password, role, zoomHostUserId } = req.body;
+    const { name, email, phone, password, role, zoomHostUserId, licenseEndDate } = req.body;
     if (!name || !password) {
       return res.status(400).json({ error: 'Name and password are required' });
     }
@@ -43,6 +43,7 @@ router.post('/', async (req, res) => {
       password,
       role: role ?? 'admin',
       zoomHostUserId,
+      licenseEndDate,
       createdBy: req.admin,
     });
     res.status(201).json({ admin });
@@ -72,8 +73,8 @@ router.get('/:id', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   try {
-    const { name, email, phone, role, zoomHostUserId } = req.body;
-    const admin = await updateAdmin(req.params.id, { name, email, phone, role, zoomHostUserId }, req.admin);
+    const { name, email, phone, role, zoomHostUserId, licenseEndDate } = req.body;
+    const admin = await updateAdmin(req.params.id, { name, email, phone, role, zoomHostUserId, licenseEndDate }, req.admin);
     res.json({ admin });
   } catch (err) {
     res.status(err.status || 500).json({ error: err.message });

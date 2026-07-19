@@ -2,6 +2,10 @@ import bcrypt from 'bcrypt';
 import { Admin } from '../models/Admin.js';
 import { AdminRefreshToken } from '../models/AdminRefreshToken.js';
 import { writeAuditLog } from './auditService.js';
+import {
+  attachLicenseFields,
+  parseLicenseEndDateInput,
+} from './adminLicenseService.js';
 
 function toPublicAdmin(admin) {
   return {
@@ -16,6 +20,7 @@ function toPublicAdmin(admin) {
     updatedAt: admin.updatedAt,
     lastLoginAt: admin.lastLoginAt,
     zoomHostUserId: admin.zoomHostUserId ?? null,
+    ...attachLicenseFields(admin),
   };
 }
 
@@ -58,6 +63,7 @@ export async function createAdmin({
   password,
   role = 'admin',
   zoomHostUserId,
+  licenseEndDate,
   createdBy,
 }) {
   const normalizedEmail = email ? String(email).toLowerCase().trim() : null;
@@ -89,6 +95,11 @@ export async function createAdmin({
 
   const normalizedZoomHostUserId = await assertZoomHostUserIdAvailable(zoomHostUserId);
 
+  let parsedLicenseEndDate = null;
+  if (role === 'admin' && licenseEndDate !== undefined && licenseEndDate !== null && licenseEndDate !== '') {
+    parsedLicenseEndDate = parseLicenseEndDateInput(licenseEndDate);
+  }
+
   const passwordHash = await bcrypt.hash(password, 12);
   const admin = await Admin.create({
     name,
@@ -97,6 +108,7 @@ export async function createAdmin({
     passwordHash,
     role,
     zoomHostUserId: normalizedZoomHostUserId,
+    licenseEndDate: parsedLicenseEndDate,
     createdBy: createdBy.sub,
   });
 
@@ -167,7 +179,25 @@ export async function updateAdmin(id, updates, actor) {
     }
   }
 
+  if (updates.licenseEndDate !== undefined) {
+    if (admin.role === 'super_admin') {
+      const err = new Error('Super admin accounts do not use license expiry');
+      err.status = 400;
+      throw err;
+    }
+    admin.licenseEndDate = parseLicenseEndDateInput(updates.licenseEndDate);
+  }
+
   await admin.save();
+
+  if (updates.licenseEndDate !== undefined) {
+    await writeAuditLog({
+      actor,
+      action: 'admin_license_updated',
+      targetAdminId: admin._id,
+      meta: { licenseEndDate: admin.licenseEndDate },
+    });
+  }
 
   await writeAuditLog({
     actor,

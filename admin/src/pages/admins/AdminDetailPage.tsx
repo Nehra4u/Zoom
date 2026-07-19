@@ -12,6 +12,7 @@ import {
 import { getErrorMessage } from '@/api/client'
 import { useAuth } from '@/auth/AuthContext'
 import { ZoomHostUserField } from '@/components/ZoomHostUserField'
+import { formatLicenseEndDate, toDateInputValue } from '@/lib/licenseDisplay'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,6 +45,7 @@ export function AdminDetailPage() {
   const [phone, setPhone] = useState('')
   const [role, setRole] = useState<'admin' | 'super_admin'>('admin')
   const [zoomHostUserId, setZoomHostUserId] = useState('')
+  const [licenseEndDate, setLicenseEndDate] = useState('')
 
   const { data: admin, isLoading } = useQuery({
     queryKey: ['admins', id],
@@ -58,6 +60,7 @@ export function AdminDetailPage() {
       setPhone(admin.phone ?? '')
       setRole(admin.role)
       setZoomHostUserId(admin.zoomHostUserId ?? '')
+      setLicenseEndDate(toDateInputValue(admin.licenseEndDate))
     }
   }, [admin])
 
@@ -82,6 +85,17 @@ export function AdminDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['admins'] })
       queryClient.invalidateQueries({ queryKey: ['admins', id] })
       toast.success('Admin updated')
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  })
+
+  const licenseMutation = useMutation({
+    mutationFn: (nextLicenseEndDate: string | null) =>
+      updateAdmin(id, { licenseEndDate: nextLicenseEndDate }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admins'] })
+      queryClient.invalidateQueries({ queryKey: ['admins', id] })
+      toast.success('License updated')
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   })
@@ -190,6 +204,64 @@ export function AdminDetailPage() {
           </form>
         </CardContent>
       </Card>
+
+      {admin.role === 'admin' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>License</CardTitle>
+            <CardDescription>Set when this admin&apos;s portal access expires</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center gap-2">
+              {!admin.licenseEndDate ? (
+                <Badge variant="secondary">Active — no expiry set</Badge>
+              ) : !admin.licenseIsActive ? (
+                <Badge variant="destructive">Expired</Badge>
+              ) : admin.licenseExpiringThisWeek ? (
+                <Badge variant="destructive">Expiring this week</Badge>
+              ) : (
+                <Badge variant="success">Active</Badge>
+              )}
+              {admin.licenseEndDate && (
+                <span className="text-sm text-muted-foreground">
+                  Expires {formatLicenseEndDate(admin.licenseEndDate)}
+                </span>
+              )}
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="license-end">License expiry date</Label>
+              <Input
+                id="license-end"
+                type="date"
+                value={licenseEndDate}
+                onChange={(e) => setLicenseEndDate(e.target.value)}
+              />
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <Button
+                type="button"
+                disabled={licenseMutation.isPending}
+                onClick={() =>
+                  licenseMutation.mutate(licenseEndDate.trim() ? licenseEndDate : null)
+                }
+              >
+                Save license
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={licenseMutation.isPending || !admin.licenseEndDate}
+                onClick={() => {
+                  setLicenseEndDate('')
+                  licenseMutation.mutate(null)
+                }}
+              >
+                Clear date (unlimited)
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
