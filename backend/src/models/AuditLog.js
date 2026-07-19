@@ -9,6 +9,7 @@ const auditLogSchema = new mongoose.Schema(
       enum: [
         'admin_created',
         'admin_updated',
+        'admin_license_updated',
         'admin_deactivated',
         'admin_activated',
         'admin_deleted',

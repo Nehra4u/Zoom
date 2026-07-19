@@ -30,6 +30,7 @@ import type { AuditLogEntry } from '@/types/audit'
 const ACTION_LABELS: Record<string, string> = {
   admin_created: 'Admin created',
   admin_updated: 'Admin updated',
+  admin_license_updated: 'Admin license updated',
   admin_deactivated: 'Admin deactivated',
   admin_activated: 'Admin activated',
   admin_deleted: 'Admin deleted',
