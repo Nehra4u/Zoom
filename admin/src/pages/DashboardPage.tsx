@@ -5,17 +5,10 @@ import { CalendarDays, CheckCircle2, ShieldCheck, Video, Wifi } from 'lucide-rea
 import { toast } from 'sonner'
 import { fetchMeetingJoinUrl, startMeeting } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
+import { DashboardClock } from '@/components/DashboardClock'
 import { StartMeetingDialog } from '@/components/StartMeetingDialog'
 import { useSessionStore, type MeetingJoinMode } from '@/stores/sessionStore'
-import type { ActiveMeeting } from '@/types/session'
-
-function formatTime(date: Date) {
-  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })
-}
-
-function formatDate(date: Date) {
-  return date.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })
-}
+import type { ActiveMeeting, MeetingJoinInfo } from '@/types/session'
 
 function apply409Meeting(
   data: { meeting?: ActiveMeeting; code?: string } | undefined,
@@ -28,7 +21,7 @@ function apply409Meeting(
   })
 }
 
-function buildZoomOpenUrl(data: Awaited<ReturnType<typeof fetchMeetingJoinUrl>>) {
+function buildZoomOpenUrl(data: MeetingJoinInfo) {
   if (data.isHost && data.startUrl) return data.startUrl
   if (data.joinUrl) return data.joinUrl
   const base = `https://zoom.us/j/${data.meetingNumber}`
@@ -37,14 +30,23 @@ function buildZoomOpenUrl(data: Awaited<ReturnType<typeof fetchMeetingJoinUrl>>)
 
 export function DashboardPage() {
   const queryClient = useQueryClient()
-  const [now, setNow] = useState(() => new Date())
   const [startDialogOpen, setStartDialogOpen] = useState(false)
-  const { meetingLive, applyLiveMeeting, joinMode, setJoinMode } = useSessionStore()
+  const meetingLive = useSessionStore((s) => s.meetingLive)
+  const applyLiveMeeting = useSessionStore((s) => s.applyLiveMeeting)
+  const joinMode = useSessionStore((s) => s.joinMode)
+  const setJoinMode = useSessionStore((s) => s.setJoinMode)
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(id)
+    void import('@/components/MeetingPortalHost')
   }, [])
+
+  useEffect(() => {
+    if (!startDialogOpen) return
+    void queryClient.prefetchQuery({
+      queryKey: ['session', 'join-url'],
+      queryFn: fetchMeetingJoinUrl,
+    })
+  }, [startDialogOpen, queryClient])
 
   const invalidateSession = () => {
     queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
@@ -58,7 +60,8 @@ export function DashboardPage() {
 
       if (useSessionStore.getState().joinMode === 'desktop') {
         try {
-          const joinInfo = await fetchMeetingJoinUrl()
+          const cached = queryClient.getQueryData<MeetingJoinInfo>(['session', 'join-url'])
+          const joinInfo = cached ?? (await fetchMeetingJoinUrl())
           const url = buildZoomOpenUrl(joinInfo)
           window.open(url, '_blank', 'noopener,noreferrer')
         } catch {
@@ -107,8 +110,8 @@ export function DashboardPage() {
     <>
       <div className="relative flex min-h-full items-center justify-center py-6">
         <section className="glass-card relative w-full max-w-4xl overflow-hidden rounded-[2rem] p-6 sm:p-8 lg:p-10">
-          <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-chart-1/15 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-28 left-12 h-64 w-64 rounded-full bg-violet-300/20 blur-3xl" />
+          <div className="pointer-events-none absolute -right-16 -top-20 h-64 w-64 rounded-full bg-chart-1/15" />
+          <div className="pointer-events-none absolute -bottom-28 left-12 h-64 w-64 rounded-full bg-violet-300/20" />
 
           <div className="relative grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
             <div>
@@ -116,12 +119,7 @@ export function DashboardPage() {
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 Workspace ready
               </div>
-              <p className="mt-6 text-xs font-semibold uppercase tracking-[0.18em] text-chart-1">
-                {formatDate(now)}
-              </p>
-              <h2 className="mt-2 text-4xl font-bold tracking-[-0.05em] text-foreground sm:text-5xl">
-                {formatTime(now)}
-              </h2>
+              <DashboardClock />
               <h3 className="mt-7 max-w-md text-2xl font-bold leading-tight tracking-[-0.035em] text-foreground">
                 Ready for your next secure meeting?
               </h3>
@@ -137,7 +135,7 @@ export function DashboardPage() {
                 ].map(({ icon: Icon, title, detail }) => (
                   <div
                     key={title}
-                    className="rounded-2xl border border-white/80 bg-white/48 p-3.5 shadow-sm backdrop-blur-xl"
+                    className="rounded-2xl border border-white/80 bg-white/70 p-3.5 shadow-sm"
                   >
                     <Icon className="h-4 w-4 text-chart-1" />
                     <p className="mt-2 text-xs font-bold text-foreground">{title}</p>
@@ -147,7 +145,7 @@ export function DashboardPage() {
               </div>
             </div>
 
-            <div className="flex flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/48 px-6 py-8 shadow-[0_24px_45px_-32px_rgba(37,99,235,0.5)] backdrop-blur-xl">
+            <div className="flex flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border border-white/80 bg-white/70 px-6 py-8 shadow-[0_24px_45px_-32px_rgba(37,99,235,0.5)]">
               <div className="relative flex h-40 w-40 items-center justify-center overflow-hidden rounded-full">
                 {!startMutation.isPending && (
                   <>

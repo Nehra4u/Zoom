@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
+import { useRecordingNowMs } from '@/components/RecordingExpiryProvider'
 
 function formatRemaining(ms: number) {
   if (ms <= 0) return 'Expired'
@@ -27,29 +28,26 @@ interface ExpiryCountdownProps {
 
 export function ExpiryCountdown({ expiresAt, recordingId, className }: ExpiryCountdownProps) {
   const queryClient = useQueryClient()
-  const [label, setLabel] = useState(() => {
-    if (!expiresAt) return 'No retention limit'
-    return formatRemaining(new Date(expiresAt).getTime() - Date.now())
-  })
+  const nowMs = useRecordingNowMs()
+  const expiredHandledRef = useRef(false)
+
+  const remaining = expiresAt ? new Date(expiresAt).getTime() - nowMs : null
+  const label = !expiresAt
+    ? 'No retention limit'
+    : formatRemaining(remaining ?? 0)
 
   useEffect(() => {
-    if (!expiresAt) return
+    if (!expiresAt || remaining === null || remaining > 0) return
+    if (expiredHandledRef.current) return
+    expiredHandledRef.current = true
+    queryClient.invalidateQueries({ queryKey: ['recordings'] })
+  }, [expiresAt, remaining, queryClient, recordingId])
 
-    const tick = () => {
-      const remaining = new Date(expiresAt).getTime() - Date.now()
-      const nextLabel = formatRemaining(remaining)
-      setLabel(nextLabel)
-      if (remaining <= 0) {
-        queryClient.invalidateQueries({ queryKey: ['recordings'] })
-      }
-    }
+  useEffect(() => {
+    expiredHandledRef.current = false
+  }, [expiresAt, recordingId])
 
-    tick()
-    const interval = window.setInterval(tick, 1000)
-    return () => window.clearInterval(interval)
-  }, [expiresAt, queryClient, recordingId])
-
-  const expired = expiresAt ? new Date(expiresAt).getTime() <= Date.now() : false
+  const expired = expiresAt ? (remaining ?? 0) <= 0 : false
 
   return (
     <span

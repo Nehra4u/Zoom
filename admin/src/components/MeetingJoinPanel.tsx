@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import { toast } from 'sonner'
-import { fetchAdminJoinToken, fetchCurrentSession, endMeeting, type AdminJoinCredentials } from '@/api/session'
+import { fetchAdminJoinToken, endMeeting, type AdminJoinCredentials } from '@/api/session'
 import { getErrorMessage } from '@/api/client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DesktopMeetingJoinCard } from '@/components/DesktopMeetingJoinCard'
 import { EndMeetingButton } from '@/components/EndMeetingButton'
 import { JoinModeBadge } from '@/components/JoinModeBadge'
-import { triggerLocalRecordingFinalize, triggerLocalRecordingStart } from '@/components/LocalRecordingDialog'
+import { triggerLocalRecordingFinalize, triggerLocalRecordingStart } from '@/lib/localRecordingEvents'
 import { useSessionStore } from '@/stores/sessionStore'
 
 interface MeetingJoinPanelProps {
@@ -64,17 +64,14 @@ export function MeetingJoinPanel({
   )
   const endedHandledRef = useRef(false)
   const queryClient = useQueryClient()
-  const {
-    joinMode,
-    portalJoined,
-    portalJoinAttempted,
-    portalJoinFailed,
-    portalJoinError,
-    setPortalJoined,
-    setPortalJoinAttempted,
-    setPortalJoinFailed,
-    clearSession,
-  } = useSessionStore()
+  const joinMode = useSessionStore((s) => s.joinMode)
+  const portalJoined = useSessionStore((s) => s.portalJoined)
+  const portalJoinAttempted = useSessionStore((s) => s.portalJoinAttempted)
+  const portalJoinFailed = useSessionStore((s) => s.portalJoinFailed)
+  const portalJoinError = useSessionStore((s) => s.portalJoinError)
+  const setPortalJoined = useSessionStore((s) => s.setPortalJoined)
+  const setPortalJoinAttempted = useSessionStore((s) => s.setPortalJoinAttempted)
+  const setPortalJoinFailed = useSessionStore((s) => s.setPortalJoinFailed)
   const [joining, setJoining] = useState(false)
   const [showFrame, setShowFrame] = useState(false)
   const [lastMeetingNumber, setLastMeetingNumber] = useState<string | null>(null)
@@ -172,19 +169,13 @@ export function MeetingJoinPanel({
         setPortalJoinFailed(false)
         triggerLocalRecordingFinalize()
         void (async () => {
-          await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
-          const snapshot = await queryClient.fetchQuery({
-            queryKey: ['session', 'current'],
-            queryFn: fetchCurrentSession,
-          })
-          if (snapshot.meetingLive) {
-            try {
-              await endMeeting()
-            } catch {
-              // Zoom may already be ended; local sync is best-effort
-            }
+          try {
+            await endMeeting()
+          } catch {
+            // Zoom may already be ended; local sync is best-effort
           }
-          clearSession()
+          useSessionStore.getState().clearSession()
+          await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
         })()
       }
     }
@@ -196,7 +187,6 @@ export function MeetingJoinPanel({
     closeFrame,
     isMini,
     queryClient,
-    clearSession,
     setPortalJoined,
     setPortalJoinFailed,
   ])
@@ -255,7 +245,7 @@ export function MeetingJoinPanel({
       setJoining(false)
       closeFrame()
       if (isMeetingEndedError(err)) {
-        clearSession()
+        useSessionStore.getState().clearSession()
         void queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
         return
       }
@@ -272,7 +262,6 @@ export function MeetingJoinPanel({
     closeFrame,
     isMini,
     queryClient,
-    clearSession,
     setPortalJoinFailed,
     setPortalJoinAttempted,
   ])

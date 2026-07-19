@@ -1,5 +1,5 @@
 import { AlertTriangle, CircleDot } from 'lucide-react'
-import { triggerLocalRecordingRestart } from '@/components/LocalRecordingDialog'
+import { triggerLocalRecordingRestart } from '@/lib/localRecordingEvents'
 import { Button } from '@/components/ui/button'
 import { useLocalRecordingStore } from '@/stores/localRecordingStore'
 import { useSessionStore } from '@/stores/sessionStore'

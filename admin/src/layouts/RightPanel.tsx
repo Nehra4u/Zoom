@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useLocation } from 'react-router-dom'
 import { UserRound, Users } from 'lucide-react'
 import { fetchUsers } from '@/api/users'
 import { fetchHealth } from '@/api/health'
@@ -18,10 +19,14 @@ function clampLatency(ms: number) {
 
 export function RightPanel() {
   const { isSuperAdmin } = useAuth()
+  const location = useLocation()
   const [latencyEma, setLatencyEma] = useState<number | null>(null)
   const [sampleCount, setSampleCount] = useState(0)
   const socketConnected = useSessionStore((s) => s.socketConnected)
+  const meetingLive = useSessionStore((s) => s.meetingLive)
   const showUserStats = !isSuperAdmin
+  const showHealthStats =
+    location.pathname.startsWith('/dashboard') || meetingLive
 
   const usersQuery = useQuery({
     queryKey: ['users'],
@@ -30,21 +35,29 @@ export function RightPanel() {
     refetchInterval: showUserStats ? (socketConnected ? false : 30_000) : false,
   })
 
-  useQuery({
+  const healthQuery = useQuery({
     queryKey: ['health', 'right-panel'],
     queryFn: async () => {
       const start = performance.now()
       const result = await fetchHealth()
-      const durationMs = Math.round(performance.now() - start)
-      setSampleCount((prev) => prev + 1)
-      setLatencyEma((prev) => {
-        if (prev === null) return durationMs
-        return Math.round(prev * (1 - EMA_ALPHA) + durationMs * EMA_ALPHA)
-      })
-      return result
+      return {
+        result,
+        durationMs: Math.round(performance.now() - start),
+      }
     },
-    refetchInterval: 30_000,
+    enabled: showHealthStats,
+    refetchInterval: showHealthStats ? 30_000 : false,
   })
+
+  useEffect(() => {
+    const durationMs = healthQuery.data?.durationMs
+    if (durationMs === undefined) return
+    setSampleCount((prev) => prev + 1)
+    setLatencyEma((prev) => {
+      if (prev === null) return durationMs
+      return Math.round(prev * (1 - EMA_ALPHA) + durationMs * EMA_ALPHA)
+    })
+  }, [healthQuery.data?.durationMs, healthQuery.dataUpdatedAt])
 
   const displayLatency = useMemo(() => {
     if (sampleCount < MIN_SAMPLES || latencyEma === null) return null
@@ -57,7 +70,7 @@ export function RightPanel() {
   )
 
   return (
-    <aside className="flex h-screen w-[240px] shrink-0 flex-col overflow-hidden border-l border-white/70 bg-card/66 shadow-[-12px_0_40px_-34px_rgba(30,64,175,0.35)] backdrop-blur-2xl">
+    <aside className="flex h-screen w-[240px] shrink-0 flex-col overflow-hidden border-l border-white/70 bg-card/95 shadow-[-12px_0_40px_-34px_rgba(30,64,175,0.35)]">
       <div className="border-b border-white/70 p-5">
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-sm font-medium text-foreground">System Status</h3>
@@ -68,7 +81,7 @@ export function RightPanel() {
         </div>
         <div className={showUserStats ? 'grid grid-cols-2 gap-3' : 'grid grid-cols-1 gap-3'}>
           {showUserStats && (
-            <div className="rounded-xl border border-white/70 bg-white/45 p-3 shadow-sm backdrop-blur-md">
+            <div className="rounded-xl border border-white/70 bg-white/60 p-3 shadow-sm">
               <p className="mb-1 whitespace-nowrap text-[9.5px] uppercase tracking-wide text-muted-foreground">
                 Active Users
               </p>
@@ -77,7 +90,7 @@ export function RightPanel() {
               </p>
             </div>
           )}
-          <div className="rounded-xl border border-white/70 bg-white/45 p-3 shadow-sm backdrop-blur-md">
+          <div className="rounded-xl border border-white/70 bg-white/60 p-3 shadow-sm">
             <p className="mb-1 whitespace-nowrap text-[9.5px] uppercase tracking-wide text-muted-foreground">
               API Latency
             </p>

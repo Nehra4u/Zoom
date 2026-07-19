@@ -10,8 +10,7 @@ import {
 } from '@/api/client'
 import { API_BASE_URL } from '@/config'
 import { useSessionStore } from '@/stores/sessionStore'
-import { triggerLocalRecordingFinalize } from '@/components/LocalRecordingDialog'
-import { showDesktopMeetingEndedDialog } from '@/components/DesktopMeetingEndedDialog'
+import { triggerLocalRecordingFinalize } from '@/lib/localRecordingEvents'
 import type { ActiveMeeting, SessionParticipant } from '@/types/session'
 
 import type { ApkUser } from '@/types/user'
@@ -40,14 +39,6 @@ export function useAdminSocket(enabled = true, isSuperAdmin = false) {
   const socketRef = useRef<Socket | null>(null)
   const queryClient = useQueryClient()
   const accessToken = getStoredAccessToken()
-  const {
-    upsertParticipant,
-    removeParticipant,
-    updateMute,
-    clearSession,
-    setMeetingStarted,
-    setSocketConnected,
-  } = useSessionStore()
 
   useEffect(() => {
     if (!enabled || !accessToken) return
@@ -71,13 +62,13 @@ export function useAdminSocket(enabled = true, isSuperAdmin = false) {
     }
 
     socket.on('connect', () => {
-      setSocketConnected(true)
+      useSessionStore.getState().setSocketConnected(true)
       if (!isSuperAdmin) {
         queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
       }
     })
-    socket.on('disconnect', () => setSocketConnected(false))
-    socket.on('connect_error', () => setSocketConnected(false))
+    socket.on('disconnect', () => useSessionStore.getState().setSocketConnected(false))
+    socket.on('connect_error', () => useSessionStore.getState().setSocketConnected(false))
 
     socket.io.on('reconnect_attempt', refreshAuth)
 
@@ -112,28 +103,28 @@ export function useAdminSocket(enabled = true, isSuperAdmin = false) {
     socket.on('session:started', (payload: { meeting: ActiveMeeting }) => {
       if (isSuperAdmin) return
       if (payload?.meeting) {
-        setMeetingStarted(payload.meeting)
+        useSessionStore.getState().setMeetingStarted(payload.meeting)
       }
     })
 
     socket.on('participant:joined', (payload: SessionParticipant) => {
       if (isSuperAdmin) return
-      upsertParticipant({ ...payload, inCall: true })
+      useSessionStore.getState().upsertParticipant({ ...payload, inCall: true })
     })
 
     socket.on('participant:left', (payload: { userId: string }) => {
       if (isSuperAdmin) return
-      removeParticipant(payload.userId)
+      useSessionStore.getState().removeParticipant(payload.userId)
     })
 
     socket.on('participant:muted', (payload: { userId: string; isMuted?: boolean }) => {
       if (isSuperAdmin) return
-      updateMute(payload.userId, payload.isMuted ?? true)
+      useSessionStore.getState().updateMute(payload.userId, payload.isMuted ?? true)
     })
 
     socket.on('participant:unmuted', (payload: { userId: string }) => {
       if (isSuperAdmin) return
-      updateMute(payload.userId, false)
+      useSessionStore.getState().updateMute(payload.userId, false)
     })
 
     socket.on('session:ended', () => {
@@ -142,9 +133,9 @@ export function useAdminSocket(enabled = true, isSuperAdmin = false) {
       if (joinMode === 'portal') {
         triggerLocalRecordingFinalize()
       } else {
-        showDesktopMeetingEndedDialog()
+        useSessionStore.getState().setDesktopEndedDialogOpen(true)
       }
-      clearSession()
+      useSessionStore.getState().clearSession()
       queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
     })
 
@@ -179,20 +170,9 @@ export function useAdminSocket(enabled = true, isSuperAdmin = false) {
       window.removeEventListener(TOKEN_REFRESH_EVENT, onTokenRefreshed)
       socket.disconnect()
       socketRef.current = null
-      setSocketConnected(false)
+      useSessionStore.getState().setSocketConnected(false)
     }
-  }, [
-    enabled,
-    accessToken,
-    isSuperAdmin,
-    upsertParticipant,
-    removeParticipant,
-    updateMute,
-    clearSession,
-    setMeetingStarted,
-    setSocketConnected,
-    queryClient,
-  ])
+  }, [enabled, accessToken, isSuperAdmin, queryClient])
 
   return socketRef
 }

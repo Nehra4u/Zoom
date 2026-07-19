@@ -9,12 +9,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MAX_USERS } from '@/types/user'
-import type { UserStatus } from '@/types/user'
+import type { ApkUser, UserStatus } from '@/types/user'
 
 export function UserCreatePage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { data: users = [] } = useQuery({ queryKey: ['users'], queryFn: () => fetchUsers() })
+  const cachedUsers = queryClient.getQueryData<ApkUser[]>(['users'])
+  const { data: users = cachedUsers ?? [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => fetchUsers(),
+    enabled: cachedUsers === undefined,
+    staleTime: 60_000,
+  })
   const atLimit = users.length >= MAX_USERS
   const [username, setUsername] = useState('')
   const [phone, setPhone] = useState('')

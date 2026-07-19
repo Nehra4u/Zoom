@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, ExternalLink, Film, LoaderCircle, Play, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -11,6 +11,7 @@ import {
 } from '@/api/recordings'
 import { getErrorMessage } from '@/api/client'
 import { ExpiryCountdown } from '@/components/ExpiryCountdown'
+import { RecordingExpiryProvider } from '@/components/RecordingExpiryProvider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -244,13 +245,19 @@ function RecordingRow({
 
 export function RecordingListPage() {
   const queryClient = useQueryClient()
-  const autoSyncedRef = useRef(false)
   const [loadingAction, setLoadingAction] = useState<'play' | 'download' | null>(null)
   const [loadingPasscode, setLoadingPasscode] = useState<string | null>(null)
 
   const { data, isLoading } = useQuery({
     queryKey: ['recordings'],
-    queryFn: fetchRecordings,
+    queryFn: async () => {
+      const initial = await fetchRecordings()
+      if (initial.recordings.length === 0) {
+        await syncRecordingsFromZoom()
+        return fetchRecordings()
+      }
+      return initial
+    },
     staleTime: 60_000,
   })
 
@@ -281,15 +288,6 @@ export function RecordingListPage() {
       if (variables?.manual) toast.error(getErrorMessage(err))
     },
   })
-
-  useEffect(() => {
-    if (autoSyncedRef.current || isLoading) return
-    autoSyncedRef.current = true
-    if (recordings.length === 0) {
-      syncMutation.mutate({ manual: false })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once after initial fetch
-  }, [isLoading, recordings.length])
 
   const isSyncing = syncMutation.isPending
 
@@ -376,29 +374,31 @@ export function RecordingListPage() {
           ) : isSyncing ? (
             <RecordingsTableSkeleton rows={Math.min(recordings.length, 6)} />
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Topic</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Duration</TableHead>
-                  <TableHead>Expires</TableHead>
-                  <TableHead>Size</TableHead>
-                  <TableHead className="text-right">Action</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recordings.map((r) => (
-                  <RecordingRow
-                    key={r.id}
-                    recording={r}
-                    onDeleted={handleRecordingDeleted}
-                    onActionStart={handleActionStart}
-                    onActionEnd={handleActionEnd}
-                  />
-                ))}
-              </TableBody>
-            </Table>
+            <RecordingExpiryProvider>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Topic</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recordings.map((r) => (
+                    <RecordingRow
+                      key={r.id}
+                      recording={r}
+                      onDeleted={handleRecordingDeleted}
+                      onActionStart={handleActionStart}
+                      onActionEnd={handleActionEnd}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
+            </RecordingExpiryProvider>
           )}
         </CardContent>
       </Card>

@@ -45,7 +45,7 @@ export function LoginPage() {
     try {
       const loggedIn = await login(identifier, password)
       if (loggedIn.role !== 'super_admin') {
-        await queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
+        void queryClient.invalidateQueries({ queryKey: ['session', 'current'] })
       }
       toast.success('Welcome back')
       const from = (location.state as { from?: { pathname: string } })?.from?.pathname

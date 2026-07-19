@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "preview": "vite preview",
     "postinstall": "mkdir -p public/zoom/vendor && cp node_modules/@zoom/meetingsdk/dist/zoom-meeting-6.2.0.min.js public/zoom/ 2>/dev/null || true && cp node_modules/@zoom/meetingsdk/dist/lib/vendor/*.min.js public/zoom/vendor/ 2>/dev/null || true"
   },
@@ -22,15 +24,11 @@
     "axios": "^1.18.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lodash": "^4.18.1",
     "lucide-react": "^1.21.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-hook-form": "^7.80.0",
-    "react-redux": "^9.3.0",
     "react-router-dom": "^7.18.0",
-    "redux": "^5.0.1",
-    "redux-thunk": "^3.1.0",
     "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.6.0",
@@ -38,6 +36,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/vite": "^4.3.1",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",

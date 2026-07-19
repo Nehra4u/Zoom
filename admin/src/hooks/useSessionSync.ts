@@ -1,11 +1,13 @@
 import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { fetchCurrentSession } from '@/api/session'
-import { showDesktopMeetingEndedDialog } from '@/components/DesktopMeetingEndedDialog'
 import { useSessionStore } from '@/stores/sessionStore'
 
 export function useSessionSync(enabled = true) {
-  const { socketConnected, meetingLive, joinMode, setSnapshot } = useSessionStore()
+  const socketConnected = useSessionStore((s) => s.socketConnected)
+  const meetingLive = useSessionStore((s) => s.meetingLive)
+  const joinMode = useSessionStore((s) => s.joinMode)
+  const setSnapshot = useSessionStore((s) => s.setSnapshot)
 
   const pollInterval =
     enabled && meetingLive
@@ -38,7 +40,7 @@ export function useSessionSync(enabled = true) {
         prev.joinMode === 'desktop' &&
         !state.desktopEndedDialogOpen
       ) {
-        showDesktopMeetingEndedDialog()
+        useSessionStore.getState().setDesktopEndedDialogOpen(true)
       }
     })
 

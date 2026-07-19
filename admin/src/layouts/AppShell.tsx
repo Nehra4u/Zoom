@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, lazy, Suspense, useEffect } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -24,15 +24,25 @@ import { useAdminSocket } from '@/hooks/useAdminSocket'
 import { useSessionSync } from '@/hooks/useSessionSync'
 import { MeetingActiveBanner } from '@/components/MeetingActiveBanner'
 import { EndMeetingButton } from '@/components/EndMeetingButton'
-import { MeetingPortalHost } from '@/components/MeetingPortalHost'
 import { TabSessionBlocker } from '@/components/TabSessionBlocker'
-import { LocalRecordingDialog, useLocalRecordingLifecycle } from '@/components/LocalRecordingDialog'
 import { RecordingInterruptedBanner, RestartRecordingButton } from '@/components/RecordingInterruptedBanner'
-import { DesktopMeetingEndedDialog } from '@/components/DesktopMeetingEndedDialog'
+import { useLocalRecordingLifecycle } from '@/lib/localRecordingEvents'
 import { RightPanel } from '@/layouts/RightPanel'
 import { useSessionStore } from '@/stores/sessionStore'
 import { fetchSubscription } from '@/api/settings'
 import logo from '@/assets/logo.svg'
+
+const MeetingPortalHost = lazy(() =>
+  import('@/components/MeetingPortalHost').then((m) => ({ default: m.MeetingPortalHost }))
+)
+const LocalRecordingDialog = lazy(() =>
+  import('@/components/LocalRecordingDialog').then((m) => ({ default: m.LocalRecordingDialog }))
+)
+const DesktopMeetingEndedDialog = lazy(() =>
+  import('@/components/DesktopMeetingEndedDialog').then((m) => ({
+    default: m.DesktopMeetingEndedDialog,
+  }))
+)
 
 interface NavItem {
   to: string
@@ -177,10 +187,17 @@ export function AppShell() {
   const { admin, isSuperAdmin, isAuthenticated } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
-  const { meetingLive, socketConnected, canEndMeeting } = useSessionStore()
-  useAdminSocket(true, isSuperAdmin)
+  const meetingLive = useSessionStore((s) => s.meetingLive)
+  const socketConnected = useSessionStore((s) => s.socketConnected)
+  const canEndMeeting = useSessionStore((s) => s.canEndMeeting)
+  useAdminSocket(!isSuperAdmin, isSuperAdmin)
   useSessionSync(!isSuperAdmin)
   useLocalRecordingLifecycle()
+
+  useEffect(() => {
+    if (isSuperAdmin || !location.pathname.startsWith('/dashboard')) return
+    void import('@/components/MeetingPortalHost')
+  }, [isSuperAdmin, location.pathname])
 
   const subscriptionQuery = useQuery({
     queryKey: ['subscription'],
@@ -189,8 +206,11 @@ export function AppShell() {
   })
 
   const isDashboard = location.pathname.startsWith('/dashboard')
+  const isUsersRoute = location.pathname.startsWith('/users')
   const showMeetingUi = !isSuperAdmin && meetingLive
   const showPortalBackground = showMeetingUi && !isDashboard
+  const showRightPanel =
+    meetingLive || isDashboard || (!isSuperAdmin && isUsersRoute)
 
   const navItems = OPERATIONS_ITEMS.filter((item) => isNavItemVisible(item, isSuperAdmin))
   const recordsItems = RECORDS_ITEMS.filter((item) => isNavItemVisible(item, isSuperAdmin))
@@ -211,10 +231,14 @@ export function AppShell() {
   return (
     <div className="app-surface flex h-screen overflow-hidden">
       <TabSessionBlocker enabled={isAuthenticated} />
-      {!isSuperAdmin && <LocalRecordingDialog />}
-      {!isSuperAdmin && <DesktopMeetingEndedDialog />}
+      {!isSuperAdmin && (
+        <Suspense fallback={null}>
+          <LocalRecordingDialog />
+          <DesktopMeetingEndedDialog />
+        </Suspense>
+      )}
       {/* Left Sidebar */}
-      <aside className="flex h-screen w-[260px] shrink-0 flex-col border-r border-white/70 bg-card/70 shadow-[12px_0_40px_-34px_rgba(30,64,175,0.35)] backdrop-blur-2xl">
+      <aside className="flex h-screen w-[260px] shrink-0 flex-col border-r border-white/70 bg-card/95 shadow-[12px_0_40px_-34px_rgba(30,64,175,0.35)]">
         {/* Logo */}
         <div className="flex h-16 items-center gap-3 border-b border-white/70 px-5">
           <img src={logo} alt="ZoomMeets" className="h-9 w-9 drop-shadow-sm" />
@@ -263,7 +287,7 @@ export function AppShell() {
         </div>
 
         {/* Bottom section */}
-        <div className="space-y-2.5 border-t border-white/70 bg-white/20 px-4 py-4 backdrop-blur-xl">
+        <div className="space-y-2.5 border-t border-white/70 bg-white/40 px-4 py-4">
           {/* Subscription renewal */}
           <div
             className={cn(
@@ -321,7 +345,7 @@ export function AppShell() {
           <button
             type="button"
             onClick={() => navigate('/system')}
-            className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-white/70 bg-white/48 p-2.5 text-left shadow-sm backdrop-blur-xl transition-all duration-200 hover:border-chart-1/20 hover:bg-white/72 hover:shadow-md"
+            className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-white/70 bg-white/60 p-2.5 text-left shadow-sm transition-all duration-200 hover:border-chart-1/20 hover:bg-white/80 hover:shadow-md"
           >
             <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-chart-1/20 to-violet-300/25 ring-1 ring-white/75">
               <span className="text-sm font-bold text-chart-1">{initials(admin?.name)}</span>
@@ -345,7 +369,7 @@ export function AppShell() {
 
       {/* Main Content */}
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/70 bg-card/58 px-8 shadow-[0_10px_32px_-28px_rgba(30,64,175,0.4)] backdrop-blur-2xl">
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-white/70 bg-card/95 px-8 shadow-[0_10px_32px_-28px_rgba(30,64,175,0.4)]">
           <div>
             <h1 className="text-lg font-semibold tracking-tight text-foreground">{heading.title}</h1>
             {heading.subtitle && <p className="text-sm text-muted-foreground">{heading.subtitle}</p>}
@@ -407,10 +431,12 @@ export function AppShell() {
         </header>
         <RecordingInterruptedBanner />
         <div className="relative flex-1 overflow-hidden">
-          <div className="pointer-events-none absolute left-[8%] top-[5%] h-72 w-72 rounded-full bg-blue-300/15 blur-3xl" />
-          <div className="pointer-events-none absolute bottom-[4%] right-[10%] h-80 w-80 rounded-full bg-violet-300/15 blur-3xl" />
+          <div className="pointer-events-none absolute left-[8%] top-[5%] h-72 w-72 rounded-full bg-blue-300/15" />
+          <div className="pointer-events-none absolute bottom-[4%] right-[10%] h-80 w-80 rounded-full bg-violet-300/15" />
           {showMeetingUi && (
-            <MeetingPortalHost mode={isDashboard ? 'visible' : 'mini'} />
+            <Suspense fallback={null}>
+              <MeetingPortalHost mode={isDashboard ? 'visible' : 'mini'} />
+            </Suspense>
           )}
           <div
             className={cn(
@@ -424,8 +450,7 @@ export function AppShell() {
         </div>
       </main>
 
-      {/* Right Panel */}
-      <RightPanel />
+      {showRightPanel && <RightPanel />}
     </div>
   )
 }
