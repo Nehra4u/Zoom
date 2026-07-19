@@ -12,7 +12,11 @@ import {
 import { getErrorMessage } from '@/api/client'
 import { useAuth } from '@/auth/AuthContext'
 import { ZoomHostUserField } from '@/components/ZoomHostUserField'
-import { formatLicenseEndDate, toDateInputValue } from '@/lib/licenseDisplay'
+import {
+  formatLicenseEndDate,
+  licenseEndDatesMatch,
+  toDateInputValue,
+} from '@/lib/licenseDisplay'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -92,9 +96,18 @@ export function AdminDetailPage() {
   const licenseMutation = useMutation({
     mutationFn: (nextLicenseEndDate: string | null) =>
       updateAdmin(id, { licenseEndDate: nextLicenseEndDate }),
-    onSuccess: () => {
+    onSuccess: (updatedAdmin, sentDate) => {
+      queryClient.setQueryData(['admins', id], updatedAdmin)
       queryClient.invalidateQueries({ queryKey: ['admins'] })
       queryClient.invalidateQueries({ queryKey: ['admins', id] })
+
+      if (!licenseEndDatesMatch(sentDate, updatedAdmin.licenseEndDate)) {
+        toast.error(
+          'License date was not saved. Deploy the latest backend (per-admin license support) and try again.'
+        )
+        return
+      }
+
       toast.success('License updated')
     },
     onError: (err) => toast.error(getErrorMessage(err)),

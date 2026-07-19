@@ -1,17 +1,35 @@
-export function formatLicenseEndDate(endDate: string | Date | null | undefined): string {
-  if (!endDate) return 'Not set'
-  const date = new Date(endDate)
-  return date.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+const UTC_DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  timeZone: 'UTC',
 }
 
+/** License dates are stored as end-of-day UTC on the backend. */
 export function toDateInputValue(endDate: string | Date | null | undefined): string {
   if (!endDate) return ''
   const date = new Date(endDate)
-  return date.toISOString().slice(0, 10)
+  if (Number.isNaN(date.getTime())) return ''
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+export function formatLicenseEndDate(endDate: string | Date | null | undefined): string {
+  if (!endDate) return 'Not set'
+  const date = new Date(endDate)
+  if (Number.isNaN(date.getTime())) return 'Not set'
+  return date.toLocaleDateString('en-GB', UTC_DATE_FORMAT)
+}
+
+export function licenseEndDatesMatch(
+  sentDate: string | null,
+  storedDate: string | null | undefined
+): boolean {
+  const sent = sentDate?.trim() || null
+  const stored = storedDate ? toDateInputValue(storedDate) : null
+  return sent === stored
 }
 
 export function formatSubscriptionRenewal(endDate: string | null, isActive: boolean) {
@@ -31,11 +49,7 @@ export function formatSubscriptionRenewal(endDate: string | null, isActive: bool
   const daysRemaining = Math.ceil((renewalDate.getTime() - now.getTime()) / msPerDay)
   const expired = !isActive
   const isUrgent = !expired && daysRemaining <= 7
-  const formatted = renewalDate.toLocaleDateString('en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  })
+  const formatted = renewalDate.toLocaleDateString('en-GB', UTC_DATE_FORMAT)
 
   let headline = 'Subscription active'
   if (expired) headline = 'Subscription ended'
