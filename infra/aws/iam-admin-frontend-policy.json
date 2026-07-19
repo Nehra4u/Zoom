@@ -1,0 +1,50 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CloudFrontAdminFrontend",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:CreateDistribution",
+        "cloudfront:CreateResponseHeadersPolicy",
+        "cloudfront:CreateInvalidation",
+        "cloudfront:GetDistribution",
+        "cloudfront:GetDistributionConfig",
+        "cloudfront:ListDistributions",
+        "cloudfront:ListOriginAccessControls",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:TagResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AcmCloudFrontCert",
+      "Effect": "Allow",
+      "Action": [
+        "acm:RequestCertificate",
+        "acm:DescribeCertificate",
+        "acm:ListCertificates"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AdminFrontendS3",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket",
+        "s3:PutBucketPolicy",
+        "s3:PutPublicAccessBlock",
+        "s3:GetBucketPolicy",
+        "s3:ListBucket",
+        "s3:PutObject",
+        "s3:DeleteObject",
+        "s3:GetObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::zoomcontrol-admin-prod-*",
+        "arn:aws:s3:::zoomcontrol-admin-prod-*/*"
+      ]
+    }
+  ]
+}

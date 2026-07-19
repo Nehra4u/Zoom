@@ -26,7 +26,12 @@ import { startRecordingRetentionJob } from './services/settingsService.js';
 const app = express();
 const httpServer = createServer(app);
 
-app.use(helmet());
+app.use(
+  helmet({
+    // API is called cross-origin from admin.meetverdure.com; default CORP blocks some browsers.
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 
 app.use(
   cors({

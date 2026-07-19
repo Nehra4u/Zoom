@@ -64,7 +64,7 @@ npm run test:mongo   # MongoDB connection check
 
 ## Deploy to AWS (backend)
 
-Admin stays on **Vercel** (`https://zoomcontrol-admin.vercel.app`). Backend deploys to **AWS Elastic Beanstalk**.
+Admin deploys to **AWS S3 + CloudFront** (`https://admin.meetverdure.com`). Backend deploys to **AWS Elastic Beanstalk**.
 
 See [`docs/AWS_RUNBOOK.md`](docs/AWS_RUNBOOK.md) and [`backend/docs/DEPLOY_AWS.md`](backend/docs/DEPLOY_AWS.md).
 

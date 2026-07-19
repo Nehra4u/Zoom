@@ -13,7 +13,7 @@ Backend: AWS Elastic Beanstalk (`zoomcontrol-backend-prod-v2`)
 | EB environment | `zoomcontrol-backend-prod-v2` |
 | EB URL (HTTP) | `zoomcontrol-backend-prod-v2.eba-rjgpwd2v.ap-south-1.elasticbeanstalk.com` |
 | Target HTTPS URL | `https://api.meetverdure.com` |
-| Admin (Vercel) | `https://zoomcontrol-admin.vercel.app` |
+| Admin (AWS) | `https://admin.meetverdure.com` (S3 + CloudFront) |
 
 ---
 
@@ -94,25 +94,58 @@ curl https://api.meetverdure.com/api/health
 
 ---
 
-## Step 3 — Update Vercel admin
+## Step 3 — Deploy admin frontend on AWS (S3 + CloudFront)
 
-Get token: https://vercel.com/account/tokens
+### 3a — Build + upload to S3 (one-time bucket, repeat for updates)
 
 ```bash
-export VERCEL_TOKEN=your_token
-export API_URL=https://api.meetverdure.com
-./scripts/update-vercel-api-url.sh
+cd /Users/amit/Desktop/admin
+npm run build
+
+export ADMIN_BUCKET=zoomcontrol-admin-prod-639355809057
+aws s3 sync dist/ s3://$ADMIN_BUCKET/ --delete
 ```
 
-Or manually in Vercel dashboard → **zoomcontrol-admin** → Settings → Environment Variables:
+Or use the deploy script (build + sync + CloudFront invalidation):
 
+```bash
+./scripts/deploy-admin-frontend.sh
 ```
-VITE_API_URL=https://api.meetverdure.com
+
+### 3b — CloudFront + SSL (automated)
+
+Attach IAM policy `infra/aws/iam-admin-frontend-policy.json` to the `zoomcontrol-deploy` user (adds CloudFront permissions).
+
+Then run:
+
+```bash
+export AWS_REGION=ap-south-1
+./scripts/setup-aws-admin-frontend.sh
 ```
 
-Then redeploy.
+The script will:
 
-Test: https://zoomcontrol-admin.vercel.app → login
+1. Use ACM certificate for `admin.meetverdure.com` (us-east-1)
+2. Print **DNS validation CNAME** (add at registrar)
+3. After cert is **ISSUED**, create CloudFront + S3 bucket policy
+4. Print **admin CNAME** → CloudFront domain
+5. Set `ADMIN_PORTAL_URL=https://admin.meetverdure.com` on EB
+
+### DNS records for admin
+
+**ACM validation:**
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | `_0e0ed3a83ca1718e004bc96de601bc55.admin` | `_2b564bae762f143dda05f375f30acecd.jkddzztszm.acm-validations.aws.` |
+
+**Admin routing (after CloudFront is created):**
+
+| Type | Name | Value |
+|------|------|-------|
+| CNAME | `admin` | *(CloudFront domain from script output, e.g. `d1234abcd.cloudfront.net`)* |
+
+Test: https://admin.meetverdure.com → login
 
 ---
 
@@ -156,7 +189,7 @@ npm run audit:prod-sdkkey
 Checklist:
 
 - [ ] `https://api.meetverdure.com/api/health` returns ok
-- [ ] Admin login works on Vercel
+- [ ] Admin login works at https://admin.meetverdure.com
 - [ ] Zoom webhook validated
 - [ ] Android APK `/api/home` returns `websocket.url` with `wss://api.meetverdure.com`
 
@@ -165,7 +198,7 @@ Checklist:
 ## Architecture (final)
 
 ```
-zoomcontrol-admin.vercel.app  ──HTTPS──►  api.meetverdure.com  (EB + ACM)
+admin.meetverdure.com (CloudFront+S3) ──HTTPS──►  api.meetverdure.com  (EB + ACM)
 Android APK                   ──HTTPS──►  api.meetverdure.com
 Zoom webhooks                 ──HTTPS──►  api.meetverdure.com/api/webhooks/zoom
                                               │
